@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([string]$Config = "config\default.toml", [switch]$Debug)
+param([string]$Config = "config\default.toml", [switch]$VerboseLogging)
 $ErrorActionPreference = "Stop"
 $repository = Split-Path -Parent $PSScriptRoot
 $python = Join-Path $repository ".venv\Scripts\python.exe"
@@ -8,5 +8,5 @@ if (-not (Test-Path -LiteralPath $python -PathType Leaf)) {
 }
 $configPath = Join-Path $repository $Config
 $arguments = @("-m", "flybg3", "--config", $configPath)
-if ($Debug) { $arguments += "--debug" }
+if ($VerboseLogging) { $arguments += "--debug" }
 & $python @arguments
