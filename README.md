@@ -2,7 +2,7 @@
 
 NPC de Baldur's Gate 3 controlado por uma simulação neural spiking cuja conectividade deriva do connectome MaleCNS v1.0 de *Drosophila melanogaster*.
 
-O marco atual é deliberadamente **log-only**:
+O marco atual executa **movimento físico derivado da atividade neural**:
 
 ```text
 BG3 + Script Extender (Lua, server-side)
@@ -17,10 +17,13 @@ flybrain 0.1.0 — MaleCNS congelado
 decoder neural
        │ action.json
        ▼
-console BG3: Neural decision #N: TURN_LEFT
+BG3SE valida turno e caminho
+       │ CharacterMoveToPosition
+       ▼
+Flyman move no mundo do jogo
 ```
 
-Não há caminho ativo de movimento. `ActionExecutor.lua` é um protótipo futuro e não é carregado pelo bootstrap. O decoder recebe somente taxas de disparo de DNa02, DNp01, DNg100 e MDN. Ele não recebe posição, distância, direção ou velocidade do mundo.
+O decoder recebe somente taxas de disparo de DNa02, DNp01, DNg100 e MDN. Ele não recebe posição, distância, direção ou velocidade do mundo. A observação só volta a ser usada depois da decisão, no adaptador físico que converte `TURN_LEFT`, `TURN_RIGHT`, `APPROACH` ou `RETREAT` em um destino curto e navegável.
 
 ## Requisitos
 
@@ -95,7 +98,7 @@ Instale primeiro o Script Extender pelo procedimento oficial. Depois:
 
 O instalador copia somente `build\FlyBG3.pak` para `%LOCALAPPDATA%\Larian Studios\Baldur's Gate 3\Mods`. Ele não sobrescreve um pacote existente sem `-Force` e não edita `modsettings.lsx`. Ative FlyBG3 no BG3 Mod Manager ou no gerenciador de mods do jogo.
 
-## Prova log-only no BG3
+## Executar no BG3
 
 1. Inicie o bridge antes de carregar o save:
 
@@ -116,6 +119,7 @@ Saída esperada no console:
 ```text
 [FlyBG3] Observation #1 sent
 [FlyBG3] Neural decision #1: TURN_LEFT
+[FlyBG3] Physical action #1: TURN_LEFT (issued)
 ```
 
 Arquivos de comunicação no Windows:
@@ -133,9 +137,9 @@ O UUID persistido pelo comando do console fica em `settings.json` nesse diretór
 
 ## Primeiro movimento físico
 
-Depois de confirmar os dois logs acima, o pacote atual pode emitir um movimento lateral pequeno ou um passo de aproximação/fuga. O executor só aceita uma resposta com o mesmo `session_id` e `request_id`, revalida que o personagem ainda pode agir e exige um hostil visível ou dano recente. `TURN_LEFT` e `TURN_RIGHT` significam um `lateral_step` de 2 m; não são uma rotação arbitrária, porque o Script Extender não expõe uma chamada Lua documentada para definir yaw.
+O pacote atual pode emitir um movimento lateral pequeno ou um passo de aproximação/fuga. O executor só aceita uma resposta com o mesmo `session_id` e `request_id`, revalida que o personagem ainda pode agir e exige um hostil visível ou dano recente. `TURN_LEFT` e `TURN_RIGHT` significam um `lateral_step` de 2 m; não são uma rotação arbitrária, porque o Script Extender não expõe uma chamada Lua documentada para definir yaw.
 
-O caminho físico valida primeiro o destino com `Ext.Level.BeginPathfindingImmediate`/`FindPath`/`ReleasePath` e só então usa `Osi.CharacterMoveToPosition`, APIs confirmadas na documentação e em um mod server-side real. Essa chamada pode ignorar AP/turno em combate e pode cair para teleporte quando o destino está bloqueado, por isso `AllowCombatMovement = false` permanece como padrão. O primeiro milestone físico é deliberadamente fora de combate; movimento turn-based exige um estado Anubis próprio e será tratado depois. A limitação e as fontes estão em [RESEARCH.md](docs/RESEARCH.md#movimento-e-combate-diferença-importante).
+O caminho físico valida primeiro o destino com `Ext.Level.BeginPathfindingImmediate`/`FindPath`/`ReleasePath` e só então usa `Osi.CharacterMoveToPosition`, APIs confirmadas na documentação e em um mod server-side real. Essa chamada pode ignorar AP/turno em combate e pode cair para teleporte quando o destino está bloqueado, por isso `AllowCombatMovement = false` permanece como padrão. O movimento foi comprovado em BG3SE v32 tanto para `TURN_RIGHT` quanto para `TURN_LEFT`; o teste em combate usou a opção experimental abaixo. A limitação e as fontes estão em [RESEARCH.md](docs/RESEARCH.md#movimento-e-combate-diferença-importante).
 
 Comandos de controle no console server-side:
 
@@ -155,7 +159,7 @@ python -m pytest -q
 python -m pytest -q -m brain
 ```
 
-O primeiro conjunto não exige download do cérebro. O segundo carrega o MaleCNS real, verifica causalidade, continuidade de estado e a ablação de propagação sináptica. Os arquivos Lua são parseados com Lua 5.4 e há um teste que falha se o caminho ativo log-only voltar a carregar chamadas de movimento.
+O primeiro conjunto não exige download do cérebro. O segundo carrega o MaleCNS real, verifica causalidade, continuidade de estado e a ablação de propagação sináptica. Os arquivos Lua são parseados com Lua 5.4; os testes também verificam os gates do executor, o `vec3` posicional do pathfinder e o proxy chamável das funções Osiris.
 
 ## Evidência e limitações
 
@@ -163,4 +167,4 @@ As APIs, commits consultados, grupos neuronais e pesquisas funcionais estão em 
 
 O conectoma fornece conectividade derivada de microscopia eletrônica. O modelo LIF usa neurônios pontuais e parâmetros calibrados pelo projeto `fly.ai`; não modela dendritos detalhados, neurônios graduados, neuromodulação, plasticidade ou toda a fisiologia da mosca. Os estímulos visuais são detectores abstratos. Este projeto não demonstra consciência e não deve ser descrito como uma mosca literal jogando BG3.
 
-O teste vivo ainda requer o jogo, um save e um UUID real. Movimento físico continuará desativado até a comprovação dos dois logs acima.
+O pipeline e o movimento físico foram validados num save real. Ataque básico e encerramento automático de turno ainda não fazem parte deste milestone. `UseSpell` não será tratado como ataque normal porque a API Osiris documentada ignora pré-condições de acesso e recursos; qualquer integração de combate completa deve preservar essa limitação ou usar um mecanismo de ação do jogo que respeite a economia do turno.
