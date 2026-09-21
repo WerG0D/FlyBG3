@@ -50,6 +50,16 @@ local function poll(session, rid)
     if response and matches(response, p) then
         FlyBG3.pending = nil -- consume before invoking engine; at most once
         log("Neural decision #" .. rid .. ": " .. string.upper(response.action))
+        if response.action ~= "idle" then
+            local executed, issued, reason = pcall(ActionExecutor.execute, response, p.observation)
+            if not executed then
+                warn("Action executor failed #" .. rid .. ": " .. tostring(issued))
+            elseif issued then
+                log("Physical action #" .. rid .. ": " .. string.upper(response.action) .. " (" .. tostring(reason) .. ")")
+            else
+                warn("Physical action skipped #" .. rid .. ": " .. tostring(reason))
+            end
+        end
         return
     end
     Ext.Timer.WaitForRealtime(FlyBG3Config.PollMs, function() poll(session, rid) end)
@@ -148,4 +158,15 @@ Ext.RegisterConsoleCommand("flybg3_start", function()
     FlyBG3Config.Enabled = true
     if not FlyBG3.session then FlyBG3.start() end
     log("Enabled")
+end)
+Ext.RegisterConsoleCommand("flybg3_physical", function(_, value)
+    local enabled = tostring(value or ""):lower() == "on"
+    FlyBG3Config.PhysicalActionsEnabled = enabled
+    log("Physical actions " .. (enabled and "enabled" or "disabled"))
+end)
+Ext.RegisterConsoleCommand("flybg3_combat_move", function(_, value)
+    local enabled = tostring(value or ""):lower() == "on"
+    FlyBG3Config.AllowCombatMovement = enabled
+    log("Combat movement " .. (enabled and "enabled" or "disabled") ..
+        " (CharacterMoveToPosition bypasses AP/turn economy)")
 end)

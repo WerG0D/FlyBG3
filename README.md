@@ -131,6 +131,23 @@ Arquivos de comunicação no Windows:
 
 O UUID persistido pelo comando do console fica em `settings.json` nesse diretório. `FLYBG3_NPC_UUID` ou `[bridge].npc_uuid` pode restringir o bridge ao mesmo personagem. Nenhum UUID de NPC fictício vem configurado.
 
+## Primeiro movimento físico
+
+Depois de confirmar os dois logs acima, o pacote atual pode emitir um movimento lateral pequeno ou um passo de aproximação/fuga. O executor só aceita uma resposta com o mesmo `session_id` e `request_id`, revalida que o personagem ainda pode agir e exige um hostil visível ou dano recente. `TURN_LEFT` e `TURN_RIGHT` significam um `lateral_step` de 2 m; não são uma rotação arbitrária, porque o Script Extender não expõe uma chamada Lua documentada para definir yaw.
+
+O caminho físico valida primeiro o destino com `Ext.Level.BeginPathfindingImmediate`/`FindPath`/`ReleasePath` e só então usa `Osi.CharacterMoveToPosition`, APIs confirmadas na documentação e em um mod server-side real. Essa chamada pode ignorar AP/turno em combate e pode cair para teleporte quando o destino está bloqueado, por isso `AllowCombatMovement = false` permanece como padrão. O primeiro milestone físico é deliberadamente fora de combate; movimento turn-based exige um estado Anubis próprio e será tratado depois. A limitação e as fontes estão em [RESEARCH.md](docs/RESEARCH.md#movimento-e-combate-diferença-importante).
+
+Comandos de controle no console server-side:
+
+```text
+!flybg3_physical on
+!flybg3_physical off
+!flybg3_combat_move on   # experimental; bypassa AP/turno
+!flybg3_combat_move off
+```
+
+Se uma decisão neural for produzida sem alvo/dano atual, o console registra `Physical action skipped` e o personagem permanece parado. Isso preserva a atividade espontânea do connectome para o experimento sem transformar tonicidade em movimento inesperado.
+
 ## Testes
 
 ```powershell
