@@ -100,9 +100,9 @@ function ActionExecutor.execute(action, observation)
     if not point then return false, pointReason end
     local pathOk, pathReason = reachable(uuid, point)
     if not pathOk then return false, pathReason end
-    if type(Osi.CharacterMoveToPosition) ~= "function" then
-        return false, "CharacterMoveToPosition_unavailable"
-    end
+    -- Osiris names are BG3SE LightCppValue callable proxies, not ordinary Lua
+    -- functions. Calling through pcall both supports that proxy and reports a
+    -- useful error if this name/arity is absent in the loaded game build.
     local ok, errorMessage = pcall(Osi.CharacterMoveToPosition, uuid, point.x, point.y, point.z,
         tostring(FlyBG3Config.MovementSpeed or "Walk"), tostring(FlyBG3Config.MovementEvent or ""),
         math.floor(number(FlyBG3Config.MovementId, 0)))

@@ -30,12 +30,18 @@ def test_action_executor_requires_current_stimulus_and_issues_move():
     runtime = LuaRuntime(unpack_returned_tuples=True)
     runtime.execute("""
         calls = { count = 0 }
+        move_proxy = setmetatable({}, {
+            __call = function(_, ...)
+                calls.count = calls.count + 1
+                calls.args = {...}
+            end
+        })
         Osi = {
             IsInteractionDisabled = function(_) return 0 end,
             IsDead = function(_) return 0 end,
             GetHitpoints = function(_) return 10 end,
             IsInCombat = function(_) return 0 end,
-            CharacterMoveToPosition = function(...) calls.count = calls.count + 1; calls.args = {...} end
+            CharacterMoveToPosition = move_proxy
         }
         Ext = {
             Entity = { Get = function(_) return {} end },
@@ -64,6 +70,7 @@ def test_action_executor_requires_current_stimulus_and_issues_move():
         }
     """)
     runtime.execute((LUA / "ActionExecutor.lua").read_text(encoding="utf-8"))
+    assert runtime.eval('type(Osi.CharacterMoveToPosition)') == "table"
     no_stimulus = """
         return ActionExecutor.execute(
             {action="turn_left"},
