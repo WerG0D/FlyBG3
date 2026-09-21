@@ -11,3 +11,6 @@ runtime/
 config/local.toml
 *.npz
 *.pak
+gold.*.log
+network.*.log
+db/
