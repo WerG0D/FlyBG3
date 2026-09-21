@@ -89,6 +89,27 @@ def test_action_executor_requires_current_stimulus_and_issues_move():
     assert args[4] == 0
     assert args[5] == "Walk"
 
+    runtime.execute("calls.count = 0; Ext.Level.FindPath = function(_) return false end")
+    ok, reason = runtime.execute(with_target)
+    assert ok is False
+    assert reason == "destination_unreachable"
+    assert runtime.globals().calls["count"] == 0
+
+    runtime.execute("Ext.Level.FindPath = function(_) return true end")
+    combat_target = """
+        return ActionExecutor.execute(
+            {action="turn_right"},
+            {npc={uuid="npc", heading_degrees=0, position={x=0, y=1, z=0}},
+             combat={active=true, my_turn=true},
+             nearest_hostile={uuid="enemy", relative_angle=45, visible=true},
+             stimuli={damage_fraction=0}}
+        )
+    """
+    ok, reason = runtime.execute(combat_target)
+    assert ok is False
+    assert reason == "combat_movement_disabled"
+    assert runtime.globals().calls["count"] == 0
+
 
 def test_manifest_files_parse():
     config = json.loads((ROOT / "ScriptExtender/Config.json").read_text())
