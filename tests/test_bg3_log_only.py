@@ -25,6 +25,7 @@ def test_physical_milestone_is_guarded():
     assert 'RegisterListener("EntityEvent", 2' in active
     assert 'RegisterListener("CharacterMoveToCancelled", 2' in active
     assert "pcall(Osi.EndTurn, uuid)" in active
+    assert 'finishTurn({uuid=p.observation.npc.uuid, request_id=rid, action="idle"})' in active
     assert '"Observation #" .. rid .. " sent"' in active
     assert '"Neural decision #" .. rid' in active
 

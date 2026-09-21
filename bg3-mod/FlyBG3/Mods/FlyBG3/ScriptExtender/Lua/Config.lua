@@ -23,5 +23,5 @@ FlyBG3Config = {
     MovementEventPrefix = "FlyBG3_Move_",
     MovementId = 0, -- 0 derives a unique ID from request_id
     MovementCompletionTimeoutMs = 10000,
-    EndTurnAfterPhysicalAction = false -- opt-in: !flybg3_auto_end on
+    AutoEndTurn = false -- opt-in: !flybg3_auto_end on
 }

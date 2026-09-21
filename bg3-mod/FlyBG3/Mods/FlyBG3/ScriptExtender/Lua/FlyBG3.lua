@@ -4,14 +4,14 @@ local function log(message) Ext.Utils.Print("[FlyBG3] " .. message) end
 local function warn(message) Ext.Utils.PrintWarning("[FlyBG3] " .. message) end
 
 local function finishTurn(completion)
-    if not FlyBG3Config.EndTurnAfterPhysicalAction then return end
+    if not FlyBG3Config.AutoEndTurn then return end
     local uuid = completion and completion.uuid
     if not uuid or Osi.IsInCombat(uuid) ~= 1 or not Observation.myTurn(uuid) then return end
     local ok, reason = pcall(Osi.EndTurn, uuid)
     if ok then
-        log("Turn end requested after physical action #" .. tostring(completion.request_id))
+        log("Turn end requested after neural decision #" .. tostring(completion.request_id))
     else
-        warn("EndTurn failed after action #" .. tostring(completion.request_id) .. ": " .. tostring(reason))
+        warn("EndTurn failed after decision #" .. tostring(completion.request_id) .. ": " .. tostring(reason))
     end
 end
 
@@ -77,6 +77,8 @@ local function poll(session, rid)
             else
                 warn("Physical action skipped #" .. rid .. ": " .. tostring(reason))
             end
+        else
+            finishTurn({uuid=p.observation.npc.uuid, request_id=rid, action="idle"})
         end
         return
     end
@@ -206,6 +208,6 @@ Ext.RegisterConsoleCommand("flybg3_combat_move", function(_, value)
 end)
 Ext.RegisterConsoleCommand("flybg3_auto_end", function(_, value)
     local enabled = tostring(value or ""):lower() == "on"
-    FlyBG3Config.EndTurnAfterPhysicalAction = enabled
-    log("Automatic EndTurn after completed physical action " .. (enabled and "enabled" or "disabled"))
+    FlyBG3Config.AutoEndTurn = enabled
+    log("Automatic EndTurn after neural decision " .. (enabled and "enabled" or "disabled"))
 end)
