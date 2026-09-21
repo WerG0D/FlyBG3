@@ -1,0 +1,11 @@
+# Copy to config/local.toml; omitted parameters retain defaults.
+[bridge]
+# For offline filesystem tests; omit for the real Script Extender path.
+directory = "runtime/fake"
+npc_uuid = "" # insert actual save UUID; never use synthetic test UUIDs in BG3
+log_directory = "logs"
+log_level = "DEBUG"
+
+[performance]
+device = "auto"
+decision_timeout_ms = 3000

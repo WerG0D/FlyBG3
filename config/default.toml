@@ -1,0 +1,38 @@
+[brain]
+simulation_steps = 50
+dt = 0.02
+seed = 42
+data = "" # FLY_DATA or ~/fly-data
+warmup_steps = 10 # compile Numba before ready
+
+[encoder]
+max_distance = 30.0 # metres
+object_radius = 0.5 # abstract target radius in metres
+looming_gain = 10.0 # angular growth (rad/s) -> voltage / step
+left_right_gain = 1.0
+damage_gain = 0.8 # nondirectional LC4 threat proxy, not nociception
+tracking_gain = 0.6
+cap = 0.8 # maximum injected voltage per neuron per step
+minimum_sample_seconds = 0.05
+maximum_sample_seconds = 10.0
+
+[decoder]
+minimum_activity = 0.1 # dimensionless score, not a biological threshold
+rate_scale_hz = 10.0
+decision_window = 50 # last N steps of each decision
+smoothing = 0.25 # fraction of previous score retained
+hysteresis = 0.05 # score advantage required to switch
+minimum_action_decisions = 1
+
+[performance]
+device = "auto" # cpu, cuda, auto; CUDA requires official GPU extra
+cpu_threads = 4 # Numba; avoids oversubscription on desktop
+decision_timeout_ms = 3000 # Lua must use same or greater timeout
+poll_ms = 100
+
+[bridge]
+directory = "" # default Windows Script Extender/FlyBG3
+npc_uuid = "" # optional UUID filter; FLYBG3_NPC_UUID overrides this
+log_directory = "logs"
+log_level = "INFO"
+max_json_bytes = 262144

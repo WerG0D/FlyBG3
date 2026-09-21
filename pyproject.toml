@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "flybg3"
+version = "0.1.0"
+description = "BG3 NPC driven by a frozen MaleCNS spiking connectome"
+requires-python = ">=3.11"
+dependencies = ["flybrain==0.1.0"]
+
+[project.optional-dependencies]
+test = ["pytest>=8", "jsonschema>=4", "lupa>=2.2"]
+gpu = ["flybrain[gpu]==0.1.0"]
+
+[project.scripts]
+flybg3 = "flybg3.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["flybg3*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-m 'not brain'"
+markers = ["brain: downloads/loads real MaleCNS; explicit opt-in"]
