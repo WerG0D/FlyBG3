@@ -7,6 +7,10 @@ from pathlib import Path
 import tempfile
 import time
 
+REPLACE_RETRY_SECONDS = 1.0
+REPLACE_RETRY_INITIAL_SECONDS = 0.005
+REPLACE_RETRY_MAX_SECONDS = 0.05
+
 
 def atomic_write_json(path: Path, data: dict) -> None:
     path = Path(path)
@@ -18,14 +22,18 @@ def atomic_write_json(path: Path, data: dict) -> None:
             f.write(payload)
             f.flush()
             os.fsync(f.fileno())
-        for attempt in range(6):
+        deadline = time.monotonic() + REPLACE_RETRY_SECONDS
+        delay = REPLACE_RETRY_INITIAL_SECONDS
+        while True:
             try:
                 os.replace(name, path)
                 break
             except PermissionError:
-                if attempt == 5:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
                     raise
-                time.sleep(0.01 * (attempt + 1))
+                time.sleep(min(delay, remaining))
+                delay = min(delay * 2, REPLACE_RETRY_MAX_SECONDS)
     finally:
         Path(name).unlink(missing_ok=True)
 
