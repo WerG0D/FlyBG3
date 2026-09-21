@@ -104,6 +104,8 @@ O instalador copia somente `build\FlyBG3.pak` para `%LOCALAPPDATA%\Larian Studio
    python -m flybg3 --config config\default.toml
    ```
 
+   Para iniciar pelo launcher PowerShell com logs detalhados, use `.\scripts\run_bridge.ps1 -VerboseLogging` (o nome evita conflito com o parâmetro comum `-Debug` do PowerShell).
+
 2. Abra BG3, carregue um save e use o console server-side do Script Extender.
 3. Para o primeiro teste, obtenha o avatar do host com `_P(Osi.GetHostCharacter())` e copie o GUID real retornado.
 4. Vincule o personagem: `!flybg3_bind SEU-UUID-REAL`.
