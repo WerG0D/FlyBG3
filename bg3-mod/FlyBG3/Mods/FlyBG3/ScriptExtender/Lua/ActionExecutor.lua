@@ -4,7 +4,7 @@
 -- consumes the already-decoded action and the matching observation solely to
 -- turn a neural command into a small, bounded movement request. It never
 -- chooses an action from position, distance, direction, or speed.
-ActionExecutor = {}
+ActionExecutor = {pending=nil}
 
 local function number(value, fallback)
     if type(value) == "number" and value == value and value < math.huge and value > -math.huge then
@@ -88,12 +88,52 @@ local function reachable(uuid, point)
     return true
 end
 
+local function movementIdentity(action)
+    local requestId = math.max(1, math.floor(number(action.request_id, 1)))
+    local configured = math.floor(number(FlyBG3Config.MovementId, 0))
+    local moveId = configured ~= 0 and configured or requestId % 2147483647
+    if moveId == 0 then moveId = 1 end
+    return tostring(FlyBG3Config.MovementEventPrefix or "FlyBG3_Move_") .. tostring(requestId), moveId, requestId
+end
+
+function ActionExecutor.consumeArrival(uuid, event)
+    local pending = ActionExecutor.pending
+    if pending and Observation.uuid(uuid) == pending.uuid and tostring(event) == pending.event then
+        ActionExecutor.pending = nil
+        return pending
+    end
+end
+
+function ActionExecutor.consumeCancellation(uuid, moveId)
+    local pending = ActionExecutor.pending
+    if pending and Observation.uuid(uuid) == pending.uuid and number(moveId, -1) == pending.move_id then
+        ActionExecutor.pending = nil
+        return pending
+    end
+end
+
+function ActionExecutor.expire(expected)
+    if ActionExecutor.pending == expected then
+        ActionExecutor.pending = nil
+        return expected
+    end
+end
+
+function ActionExecutor.isPending(expected)
+    return ActionExecutor.pending == expected
+end
+
+function ActionExecutor.clear()
+    ActionExecutor.pending = nil
+end
+
 function ActionExecutor.execute(action, observation)
     if type(action) ~= "table" then return false, "invalid_action" end
     local actionName = tostring(action.action or ""):lower()
     if actionName == "idle" then return true, "idle" end
     local uuid = Observation.uuid(observation and observation.npc and observation.npc.uuid)
     if not uuid then return false, "npc_uuid_unavailable" end
+    if ActionExecutor.pending then return false, "physical_action_in_progress" end
     local allowed, reason = currentGate(uuid, observation)
     if not allowed then return false, reason end
     local point, pointReason = destination(actionName, observation)
@@ -103,9 +143,15 @@ function ActionExecutor.execute(action, observation)
     -- Osiris names are BG3SE LightCppValue callable proxies, not ordinary Lua
     -- functions. Calling through pcall both supports that proxy and reports a
     -- useful error if this name/arity is absent in the loaded game build.
+    local event, moveId, requestId = movementIdentity(action)
+    local completion = {uuid=uuid, event=event, move_id=moveId,
+        request_id=requestId, action=actionName}
+    ActionExecutor.pending = completion -- set before call; arrival may be synchronous
     local ok, errorMessage = pcall(Osi.CharacterMoveToPosition, uuid, point.x, point.y, point.z,
-        tostring(FlyBG3Config.MovementSpeed or "Walk"), tostring(FlyBG3Config.MovementEvent or ""),
-        math.floor(number(FlyBG3Config.MovementId, 0)))
-    if not ok then return false, "CharacterMoveToPosition_failed: " .. tostring(errorMessage) end
-    return true, "issued"
+        tostring(FlyBG3Config.MovementSpeed or "Walk"), event, moveId)
+    if not ok then
+        ActionExecutor.expire(completion)
+        return false, "CharacterMoveToPosition_failed: " .. tostring(errorMessage)
+    end
+    return true, "issued", completion
 end

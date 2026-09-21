@@ -3,6 +3,18 @@ local allowed = {idle=true, approach=true, retreat=true, turn_left=true, turn_ri
 local function log(message) Ext.Utils.Print("[FlyBG3] " .. message) end
 local function warn(message) Ext.Utils.PrintWarning("[FlyBG3] " .. message) end
 
+local function finishTurn(completion)
+    if not FlyBG3Config.EndTurnAfterPhysicalAction then return end
+    local uuid = completion and completion.uuid
+    if not uuid or Osi.IsInCombat(uuid) ~= 1 or not Observation.myTurn(uuid) then return end
+    local ok, reason = pcall(Osi.EndTurn, uuid)
+    if ok then
+        log("Turn end requested after physical action #" .. tostring(completion.request_id))
+    else
+        warn("EndTurn failed after action #" .. tostring(completion.request_id) .. ": " .. tostring(reason))
+    end
+end
+
 local function read(name)
     local content = Ext.IO.LoadFile(FlyBG3Config.Directory .. name)
     if not content or #content > 262144 then return nil end
@@ -51,11 +63,17 @@ local function poll(session, rid)
         FlyBG3.pending = nil -- consume before invoking engine; at most once
         log("Neural decision #" .. rid .. ": " .. string.upper(response.action))
         if response.action ~= "idle" then
-            local executed, issued, reason = pcall(ActionExecutor.execute, response, p.observation)
+            local executed, issued, reason, completion = pcall(ActionExecutor.execute, response, p.observation)
             if not executed then
                 warn("Action executor failed #" .. rid .. ": " .. tostring(issued))
             elseif issued then
                 log("Physical action #" .. rid .. ": " .. string.upper(response.action) .. " (" .. tostring(reason) .. ")")
+                if completion and ActionExecutor.isPending(completion) then
+                    Ext.Timer.WaitForRealtime(FlyBG3Config.MovementCompletionTimeoutMs, function()
+                        local expired = ActionExecutor.expire(completion)
+                        if expired then warn("Physical action #" .. rid .. " completion timeout") end
+                    end)
+                end
             else
                 warn("Physical action skipped #" .. rid .. ": " .. tostring(reason))
             end
@@ -110,6 +128,7 @@ local function autonomousLoop(session)
 end
 
 function FlyBG3.start()
+    ActionExecutor.clear()
     FlyBG3.session = tostring(Ext.Utils.GenerateGuid())
     FlyBG3.request, FlyBG3.pending, FlyBG3.sampling, FlyBG3.previous = 0, nil, false, nil
     local persisted = read("settings.json")
@@ -131,7 +150,21 @@ end)
 Ext.Osiris.RegisterListener("TurnEnded", 1, "after", function(character)
     if Observation.uuid(character) == Observation.uuid(FlyBG3Config.ControlledCharacter) then
         FlyBG3.pending, FlyBG3.sampling = nil, false
+        ActionExecutor.clear()
         FlyBG3.request = FlyBG3.request + 1 -- invalidates in-flight sample callbacks
+    end
+end)
+Ext.Osiris.RegisterListener("EntityEvent", 2, "after", function(object, event)
+    local completion = ActionExecutor.consumeArrival(object, event)
+    if completion then
+        log("Physical action #" .. tostring(completion.request_id) .. " completed")
+        finishTurn(completion)
+    end
+end)
+Ext.Osiris.RegisterListener("CharacterMoveToCancelled", 2, "after", function(character, moveId)
+    local completion = ActionExecutor.consumeCancellation(character, moveId)
+    if completion then
+        warn("Physical action #" .. tostring(completion.request_id) .. " cancelled")
     end
 end)
 
@@ -151,6 +184,7 @@ Ext.RegisterConsoleCommand("flybg3_observe", function() FlyBG3.requestObservatio
 Ext.RegisterConsoleCommand("flybg3_stop", function()
     FlyBG3Config.Enabled = false
     FlyBG3.pending, FlyBG3.sampling = nil, false
+    ActionExecutor.clear()
     FlyBG3.request = FlyBG3.request + 1
     log("Stopped")
 end)
@@ -169,4 +203,9 @@ Ext.RegisterConsoleCommand("flybg3_combat_move", function(_, value)
     FlyBG3Config.AllowCombatMovement = enabled
     log("Combat movement " .. (enabled and "enabled" or "disabled") ..
         " (CharacterMoveToPosition bypasses AP/turn economy)")
+end)
+Ext.RegisterConsoleCommand("flybg3_auto_end", function(_, value)
+    local enabled = tostring(value or ""):lower() == "on"
+    FlyBG3Config.EndTurnAfterPhysicalAction = enabled
+    log("Automatic EndTurn after completed physical action " .. (enabled and "enabled" or "disabled"))
 end)

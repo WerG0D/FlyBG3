@@ -20,8 +20,11 @@ def test_physical_milestone_is_guarded():
     assert 'Ext.Require("ActionExecutor.lua")' in bootstrap
     assert "ActionExecutor.execute" in active
     assert "Osi.CharacterMoveToPosition" in executor
-    for forbidden in ("Osi.EndTurn(", "PurgeOsirisQueue"):
+    for forbidden in ("PurgeOsirisQueue",):
         assert forbidden not in active
+    assert 'RegisterListener("EntityEvent", 2' in active
+    assert 'RegisterListener("CharacterMoveToCancelled", 2' in active
+    assert "pcall(Osi.EndTurn, uuid)" in active
     assert '"Observation #" .. rid .. " sent"' in active
     assert '"Neural decision #" .. rid' in active
 
@@ -65,7 +68,7 @@ def test_action_executor_requires_current_stimulus_and_issues_move():
             AllowCombatMovement = false,
             MovementDistance = 2.0,
             MovementSpeed = "Walk",
-            MovementEvent = "",
+            MovementEventPrefix = "FlyBG3_Move_",
             MovementId = 0
         }
     """)
@@ -73,7 +76,7 @@ def test_action_executor_requires_current_stimulus_and_issues_move():
     assert runtime.eval('type(Osi.CharacterMoveToPosition)') == "table"
     no_stimulus = """
         return ActionExecutor.execute(
-            {action="turn_left"},
+            {action="turn_left", request_id=7},
             {npc={uuid="npc", heading_degrees=0, position={x=0, y=1, z=0}},
              combat={active=false, my_turn=false}, stimuli={damage_fraction=0}}
         )
@@ -85,14 +88,14 @@ def test_action_executor_requires_current_stimulus_and_issues_move():
 
     with_target = """
         return ActionExecutor.execute(
-            {action="turn_left"},
+            {action="turn_left", request_id=7},
             {npc={uuid="npc", heading_degrees=0, position={x=0, y=1, z=0}},
              combat={active=false, my_turn=false},
              nearest_hostile={uuid="enemy", relative_angle=-45, visible=true},
              stimuli={damage_fraction=0}}
         )
     """
-    ok, reason = runtime.execute(with_target)
+    ok, reason, completion = runtime.execute(with_target)
     assert ok is True
     assert reason == "issued"
     assert runtime.globals().calls["count"] == 1
@@ -102,10 +105,19 @@ def test_action_executor_requires_current_stimulus_and_issues_move():
     assert args[3] == 1
     assert args[4] == 0
     assert args[5] == "Walk"
+    assert args[6] == "FlyBG3_Move_7"
+    assert args[7] == 7
     path_target = runtime.globals().calls["path_target"]
     assert abs(path_target[1] + 2.0) < 1e-6
     assert path_target[2] == 1
     assert path_target[3] == 0
+    pending = runtime.globals().ActionExecutor["pending"]
+    assert completion["request_id"] == 7
+    assert pending["request_id"] == 7
+    assert runtime.globals().ActionExecutor["isPending"](pending) is True
+    consumed = runtime.globals().ActionExecutor["consumeArrival"]("npc", "FlyBG3_Move_7")
+    assert consumed["move_id"] == 7
+    assert runtime.globals().ActionExecutor["pending"] is None
 
     runtime.execute("calls.count = 0; Ext.Level.FindPath = function(_) return false end")
     ok, reason = runtime.execute(with_target)

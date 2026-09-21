@@ -20,6 +20,8 @@ FlyBG3Config = {
     AllowCombatMovement = false,
     MovementDistance = 2.0,
     MovementSpeed = "Walk",
-    MovementEvent = "",
-    MovementId = 0
+    MovementEventPrefix = "FlyBG3_Move_",
+    MovementId = 0, -- 0 derives a unique ID from request_id
+    MovementCompletionTimeoutMs = 10000,
+    EndTurnAfterPhysicalAction = false -- opt-in: !flybg3_auto_end on
 }

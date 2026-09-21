@@ -148,9 +148,13 @@ Comandos de controle no console server-side:
 !flybg3_physical off
 !flybg3_combat_move on   # experimental; bypassa AP/turno
 !flybg3_combat_move off
+!flybg3_auto_end on      # encerra o turno após o evento oficial de chegada
+!flybg3_auto_end off
 ```
 
 Se uma decisão neural for produzida sem alvo/dano atual, o console registra `Physical action skipped` e o personagem permanece parado. Isso preserva a atividade espontânea do connectome para o experimento sem transformar tonicidade em movimento inesperado.
+
+O encerramento automático fica desativado por padrão. Quando habilitado, `CharacterMoveToPosition` recebe um evento único vinculado ao `request_id`; somente o `EntityEvent` de chegada correspondente pode chamar `EndTurn`. Cancelamento e timeout são registrados e não encerram o turno à força.
 
 ## Testes
 
