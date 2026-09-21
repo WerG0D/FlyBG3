@@ -40,7 +40,14 @@ def test_action_executor_requires_current_stimulus_and_issues_move():
         Ext = {
             Entity = { Get = function(_) return {} end },
             Level = {
-                BeginPathfindingImmediate = function(_, _) return {} end,
+                BeginPathfindingImmediate = function(_, target)
+                    calls.path_target = target
+                    assert(target[1] ~= nil and target[2] ~= nil and target[3] ~= nil,
+                        "pathfinding target must be a positional vec3")
+                    assert(target.x == nil and target.y == nil and target.z == nil,
+                        "keyed coordinates are not a BG3SE vec3")
+                    return {}
+                end,
                 FindPath = function(_) return true end,
                 ReleasePath = function(_) end
             }
@@ -88,6 +95,10 @@ def test_action_executor_requires_current_stimulus_and_issues_move():
     assert args[3] == 1
     assert args[4] == 0
     assert args[5] == "Walk"
+    path_target = runtime.globals().calls["path_target"]
+    assert abs(path_target[1] + 2.0) < 1e-6
+    assert path_target[2] == 1
+    assert path_target[3] == 0
 
     runtime.execute("calls.count = 0; Ext.Level.FindPath = function(_) return false end")
     ok, reason = runtime.execute(with_target)
@@ -109,6 +120,46 @@ def test_action_executor_requires_current_stimulus_and_issues_move():
     assert ok is False
     assert reason == "combat_movement_disabled"
     assert runtime.globals().calls["count"] == 0
+
+
+def test_action_executor_preserves_pathfinding_error_detail():
+    runtime = LuaRuntime(unpack_returned_tuples=True)
+    runtime.execute("""
+        Osi = {
+            IsInteractionDisabled = function(_) return 0 end,
+            IsDead = function(_) return 0 end,
+            GetHitpoints = function(_) return 10 end,
+            IsInCombat = function(_) return 0 end
+        }
+        Ext = {
+            Entity = { Get = function(_) return {} end },
+            Level = {
+                BeginPathfindingImmediate = function(_, _)
+                    error("native vec3 conversion failed")
+                end
+            }
+        }
+        Observation = { uuid = function(value) return value end }
+        FlyBG3Config = {
+            PhysicalActionsEnabled = true,
+            AllowOutOfCombatMovement = true,
+            AllowCombatMovement = false,
+            MovementDistance = 2.0
+        }
+    """)
+    runtime.execute((LUA / "ActionExecutor.lua").read_text(encoding="utf-8"))
+    ok, reason = runtime.execute("""
+        return ActionExecutor.execute(
+            {action="turn_right"},
+            {npc={uuid="npc", heading_degrees=0, position={x=0, y=1, z=0}},
+             combat={active=false, my_turn=false},
+             nearest_hostile={uuid="enemy", relative_angle=45, visible=true},
+             stimuli={damage_fraction=0}}
+        )
+    """)
+    assert ok is False
+    assert reason.startswith("pathfinding_request_failed: ")
+    assert "native vec3 conversion failed" in reason
 
 
 def test_manifest_files_parse():

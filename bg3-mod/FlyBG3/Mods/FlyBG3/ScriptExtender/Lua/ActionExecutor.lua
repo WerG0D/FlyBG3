@@ -69,12 +69,22 @@ local function reachable(uuid, point)
     end
     local entity = Ext.Entity.Get(uuid)
     if not entity then return false, "entity_unavailable" end
-    local started, path = pcall(Ext.Level.BeginPathfindingImmediate, entity, point)
-    if not started or not path then return false, "pathfinding_request_failed" end
+    -- glm::vec3 is marshalled by BG3SE from a positional Lua table. A keyed
+    -- {x=..., y=..., z=...} table is convenient internally, but is not a vec3
+    -- at the native boundary and makes request creation fail.
+    local target = {point.x, point.y, point.z}
+    local started, path = pcall(Ext.Level.BeginPathfindingImmediate, entity, target)
+    if not started then
+        return false, "pathfinding_request_failed: " .. tostring(path)
+    end
+    if not path then return false, "pathfinding_request_failed: no_path" end
     local found, result = pcall(Ext.Level.FindPath, path)
-    local released = pcall(Ext.Level.ReleasePath, path)
-    if not released then return false, "pathfinding_release_failed" end
-    if not found or result ~= true then return false, "destination_unreachable" end
+    local released, releaseError = pcall(Ext.Level.ReleasePath, path)
+    if not released then
+        return false, "pathfinding_release_failed: " .. tostring(releaseError)
+    end
+    if not found then return false, "pathfinding_failed: " .. tostring(result) end
+    if result ~= true then return false, "destination_unreachable" end
     return true
 end
 
