@@ -5,8 +5,10 @@ MOTOR_TYPES = ("DNa02", "DNp01", "DNg100", "MDN")
 # checked in brain.npz; none participates in the production decoder.
 CANDIDATE_DESCENDING_TYPES = (
     "DNa01", "DNb02", "DNg13",       # steering / walking
+    "DNa03", "DNa11", "aSP22",       # social pursuit / steering candidates
     "DNp09", "DNp26",                # forward locomotion / pursuit candidates
     "DNp02", "DNp10", "DNp11",      # jump / escape candidates
+    "pIP10", "pMP2",                  # courtship song outputs; comparison only
     "DNg103",                          # exploratory halt-related candidate
 )
 

@@ -210,6 +210,10 @@ def render_markdown(result: dict) -> str:
               f"{left_low['DNg13_L']['mean']:.1f}/{left_low['DNg13_R']['mean']:.1f} Hz para esquerda e "
               f"{right_low['DNg13_L']['mean']:.1f}/{right_low['DNg13_R']['mean']:.1f} Hz para direita. É candidato "
               "a uma futura comparação de steering, ainda sem peso no readout.",
+              f"- `aSP22`, `DNa03` e `DNa11` aparecem no NPZ como descending neurons bilaterais e respondem de forma "
+              f"lateral a alvos periféricos (aSP22 baixa L/R {left_low['aSP22_L']['mean']:.1f}/{left_low['aSP22_R']['mean']:.1f}; "
+              f"DNa03 baixa L/R {left_low['DNa03_L']['mean']:.1f}/{left_low['DNa03_R']['mean']:.1f}), mas não há nesta bateria "
+              "um padrão frontal específico que justifique um readout ATTACK.",
               f"- `DNg103` apresentou baseline alto em silêncio "
               f"({quiet['DNg103_L']['mean']:.1f}/{quiet['DNg103_R']['mean']:.1f} Hz) e pouca discriminação nesta bateria; "
               "não há base para tratá-lo como STOP. `DNp09`, `DNp26`, `DNp10` e `DNa01` também não produziram aqui "

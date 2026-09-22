@@ -62,9 +62,12 @@ O MaleCNS v1.0 é o conectoma completo de um único macho adulto, com 166.700 ne
 | DNa01 | 1/1 | steering de baixo ganho | somente sonda experimental |
 | DNb02 | 2/2 | turning/steering | somente sonda experimental |
 | DNg13 | 1/1 | steering, com alvo motor distinto de DNa02 | somente sonda experimental |
+| DNa03, DNa11 | 1/1 cada | steering em navegação e interações sociais | somente sondas experimentais |
+| aSP22 | 1/1 | necessário para pursuit/courtship no macho | somente sonda experimental |
 | DNp09 | 1/1 | forward/pursuit; freezing depende do contexto | somente sonda experimental |
 | DNp26 | 1/1 | aumento global de locomoção em tela optogenética | somente sonda experimental |
 | DNp02, DNp10, DNp11 | 1/1 cada | jump/escape | somente sondas experimentais |
+| pIP10, pMP2 | 1/1 cada | vias descendentes de courtship song, não ataque | somente sondas de comparação |
 | DNg103 | 1/1 | sem função assumida neste projeto | somente sonda de comparação, sem rótulo motor |
 
 `oDN1` é descrito como forward/bolt walking na literatura e aparece no conjunto conceitual do `fly.ai`, mas o próprio `fly.ai/wiz/dnscreen.py` registra “oDN1 is not in the data”. A consulta exata a `brain.cells(["oDN1"])` retorna zero; portanto ele não foi usado. `DNg12` existe no MaleCNS como `DNg12_a`…`DNg12_e`, e não como o nome agregado `DNg12`; também ficou fora desta primeira bateria.
@@ -74,12 +77,15 @@ O MaleCNS v1.0 é o conectoma completo de um único macho adulto, com 166.700 ne
 * [Yang et al., eLife 2025](https://elifesciences.org/articles/102230) mediram DNa01 e DNa02 em moscas andando: DNa02 prediz steering de alto ganho e DNa01, baixo ganho. Isso sustenta a lateralidade, não uma equivalência direta com “virar um humanoide”.
 * [Rayshubskiy et al., Current Biology 2023](https://pubmed.ncbi.nlm.nih.gov/37904997/) distinguem as saídas de DNa02 e DNg13 nos circuitos motores das pernas; ambos são relacionados a steering.
 * [Braun et al., Nature 2024](https://www.nature.com/articles/s41586-024-07523-9) mostram redes de DNs: DNp09 dirige forward walking e conecta-se a DNa02/DNb02; DNa01, DNa02 e DNb02 caem em comunidades de walking/steering. Isso recomenda leitura populacional, não tratar todo DN como botão isolado.
+* [Berg et al., MaleCNS 2026](https://pmc.ncbi.nlm.nih.gov/articles/PMC12636603/) identificam caminhos visuais sexualmente dimórficos até onze DNs, incluindo DNa02 e aSP22, necessários para steering/pursuit do macho; DNg13 aparece como via geral de steering. O NPZ instalado contém aSP22, DNa03 e DNa11 bilateralmente dentro da superclass `descending_neuron`.
 * [Bidaye et al./Chen et al., Nature Communications 2020](https://www.nature.com/articles/s41467-020-19936-x) resumem e testam MDN como comando de backward walking e seus alvos no VNC.
 * [Simpson, Current Opinion in Neurobiology 2024](https://pmc.ncbi.nlm.nih.gov/articles/PMC11215313/) revisa DNp01 como giant fiber de escape, DNp02/DNp10/DNp11 como jump/escape, DNp09 como freezing ou forward/pursuit, oDN1 como bolt forward e DNa02/DNg13 como steering.
 * [Zacarias et al., Nature Communications 2018](https://pmc.ncbi.nlm.nih.gov/articles/PMC6135764/) encontraram necessidade/suficiência de DNp09 para freezing em um paradigma de looming, mas a ativação inicialmente acelera a marcha e depois produz imobilidade. [Ache et al., Current Biology 2021](https://pmc.ncbi.nlm.nih.gov/articles/PMC8716191/) não encontraram efeito de silenciar DNp09 no freezing mediado por LC11. Assim, DNp09 não é adotado como “STOP” inequívoco.
 * [Cande et al., eLife 2018](https://elifesciences.org/articles/34275) é uma tela optogenética ampla: DNa01, DNa02 e DNp26 são alguns dos tipos com aumento global de locomoção. Fenótipo por ativação não prova que spikes naturais tenham uma única semântica.
 
 As sondas adicionais são apenas medidas em `experiments/results.json`. O decoder de produção permanece exatamente com DNa02, DNp01, DNg100 e MDN; posição, distância, direção e velocidade nunca entram nele.
+
+A bateria regenerada em 2026-09-22 incluiu `aSP22`, `DNa03`, `DNa11`, `pIP10` e `pMP2`. `aSP22`, `DNa03` e `DNa11` mostraram lateralidade em alvos periféricos, coerente com pursuit/steering, mas nenhum deles apresentou um padrão frontal separado de looming/escape. `pIP10` e `pMP2` foram mantidos apenas como comparação de courtship song. O resultado não justifica ainda um `ATTACK` neural: a próxima implementação deve ser uma calibração experimental de readout, não uma regra de distância.
 
 ## Estado da integração local BG3
 
