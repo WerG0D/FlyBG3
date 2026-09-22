@@ -11,6 +11,8 @@ runtime/
 config/local.toml
 *.npz
 *.pak
+bg3-mod/FlyBG3/Public/FlyBG3/RootTemplates/_merged.lsf
+bg3-mod/FlyBG3/Localization/English/FlyBG3.loca
 gold.*.log
 network.*.log
 db/

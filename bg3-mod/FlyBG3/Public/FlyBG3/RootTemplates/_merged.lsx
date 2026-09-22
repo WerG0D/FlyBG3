@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<save>
+    <version major="4" minor="0" revision="9" build="0" />
+    <region id="Templates">
+        <node id="Templates">
+            <children>
+                <node id="GameObjects">
+                    <attribute id="AnimationSetResourceID" type="FixedString" value="c9a06010-8832-662d-81c8-eb7b241db730" />
+                    <attribute id="CharacterVisualResourceID" type="FixedString" value="0920593a-1091-dda9-7b5b-7ee3cb87c266" />
+                    <attribute id="DisplayName" type="TranslatedString" handle="hb7bc44e8gce03g47cag89a2g180c0425a83e" version="1" />
+                    <attribute id="GeneratePortrait" type="LSString" value="Icon_Mephit_Mud" />
+                    <attribute id="Icon" type="FixedString" value="0920593a-1091-dda9-7b5b-7ee3cb87c266-_(Icon_Mephit_Mud)" />
+                    <attribute id="MapKey" type="FixedString" value="f8881547-6e53-44d4-943b-15cddef25f22" />
+                    <attribute id="Name" type="LSString" value="FlyBG3_MudMephit_Flyman" />
+                    <attribute id="ParentTemplateId" type="FixedString" value="f765566e-3f98-457b-9048-59bdcc66f51d" />
+                    <attribute id="Stats" type="FixedString" value="Mephit_Mud" />
+                    <attribute id="Type" type="FixedString" value="character" />
+                </node>
+            </children>
+        </node>
+    </region>
+</save>

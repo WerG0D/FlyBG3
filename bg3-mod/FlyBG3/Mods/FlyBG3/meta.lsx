@@ -8,7 +8,7 @@
                 <node id="ModuleInfo">
                     <attribute id="Author" type="LSWString" value="FlyBG3 contributors"/>
                     <attribute id="CharacterCreationLevelName" type="FixedString" value=""/>
-                    <attribute id="Description" type="LSWString" value="Log-only bridge from Baldur's Gate 3 to a MaleCNS neural simulation."/>
+                    <attribute id="Description" type="LSWString" value="Flyman Mud Mephit controlled by a MaleCNS neural simulation."/>
                     <attribute id="Folder" type="LSWString" value="FlyBG3"/>
                     <attribute id="GMTemplate" type="FixedString" value=""/>
                     <attribute id="LobbyLevelName" type="FixedString" value=""/>

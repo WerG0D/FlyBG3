@@ -110,9 +110,9 @@ O instalador copia somente `build\FlyBG3.pak` para `%LOCALAPPDATA%\Larian Studio
    Para iniciar pelo launcher PowerShell com logs detalhados, use `.\scripts\run_bridge.ps1 -VerboseLogging` (o nome evita conflito com o parâmetro comum `-Debug` do PowerShell).
 
 2. Abra BG3, carregue um save e use o console server-side do Script Extender.
-3. Para o primeiro teste, obtenha o avatar do host com `_P(Osi.GetHostCharacter())` e copie o GUID real retornado.
-4. Vincule o personagem: `!flybg3_bind SEU-UUID-REAL`.
-5. Fora de combate, dispare uma observação manual com `!flybg3_observe`. Em combate, `TurnStarted` dispara automaticamente para o UUID vinculado.
+3. Fora de combate, crie o corpo próprio do Flyman: `!flybg3_spawn`. O mod usa um novo template herdado de `MEPHIT_Mud_A`, com visual de Mud Mephit, e o atribui ao host como personagem controlável para evitar decisões concorrentes da IA padrão. O seu avatar não é alterado.
+4. O console deve mostrar `Flyman Mud Mephit spawned and bound: <UUID real do save>`. Anote esse UUID se tiver definido `FLYBG3_NPC_UUID` ou `[bridge].npc_uuid`: atualize o filtro ou deixe-o vazio.
+5. Fora de combate, dispare uma observação manual com `!flybg3_observe`. Em combate, `TurnStarted` dispara automaticamente para o corpo do Flyman.
 
 Saída esperada no console:
 
@@ -133,7 +133,13 @@ Arquivos de comunicação no Windows:
   requests.sqlite3
 ```
 
-O UUID persistido pelo comando do console fica em `settings.json` nesse diretório. `FLYBG3_NPC_UUID` ou `[bridge].npc_uuid` pode restringir o bridge ao mesmo personagem. Nenhum UUID de NPC fictício vem configurado.
+O UUID da instância criada fica em `settings.json` nesse diretório. O mod só aceita esse UUID se `GetTemplate` confirmar o template próprio do Flyman. Um vínculo antigo ao seu avatar é descartado ao carregar a sessão. `!flybg3_spawn` reutiliza o Flyman já presente no nível; `!flybg3_bind UUID` serve apenas para recuperar manualmente uma instância que tenha esse template. `FLYBG3_NPC_UUID` ou `[bridge].npc_uuid` pode restringir o bridge ao mesmo corpo, mas o valor anterior do seu personagem deve ser removido. Nenhum UUID de instância é inventado no código.
+
+### Recurso Mud Mephit e BG3 Toolkit
+
+O template de Flyman herda o `MEPHIT_Mud_A` extraído do `Shared.pak` instalado; usa seus recursos visuais, animações e stats, e recebe nome localizado próprio. `scripts/build_mod.ps1` compila o root template para `_merged.lsf` e a tradução para `.loca` usando LSLib antes de empacotar. O BG3 Toolkit está instalado nesta máquina, mas a interface exige o DLC separado **BG3 Toolkit Data**. A pasta `Data\Editor` contém apenas `Config`, não os dados do DLC; por isso o recurso foi preparado e compilado por LSLib, sem alegar validação no editor. Para abri-lo no Toolkit, habilite BG3 Toolkit Data nas propriedades de Baldur's Gate 3 → DLC no Steam e aguarde o download. A [instalação oficial do Toolkit](https://docs.baldursgate3.game/Getting_Started%3A_Installing_the_Toolkit) explica essa dependência.
+
+O código e o pacote foram testados localmente, mas a criação do Mud Mephit e `MakePlayer` ainda precisam de validação no seu save. Faça um save separado antes de `!flybg3_spawn`, pois a criatura é persistente e ganha retrato na party. Consulte [a nota de implementação](docs/MUD_MEPHIT.md) para os comandos e limites do teste.
 
 ## Primeiro movimento físico
 

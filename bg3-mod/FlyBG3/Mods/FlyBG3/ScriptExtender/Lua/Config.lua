@@ -1,6 +1,8 @@
 FlyBG3Config = {
     Enabled = true,
-    ControlledCharacter = "", -- actual save UUID; configure with !flybg3_bind UUID
+    ControlledCharacter = "", -- populated only after verifying Flyman's own root template
+    BodyTemplateUUID = "f8881547-6e53-44d4-943b-15cddef25f22",
+    BodyTemplate = "FlyBG3_MudMephit_Flyman_f8881547-6e53-44d4-943b-15cddef25f22",
     Debug = true,
     Directory = "FlyBG3/", -- relative to Script Extender I/O root
     DecisionTimeoutMs = 3000,
@@ -8,7 +10,7 @@ FlyBG3Config = {
     SampleIntervalMs = 200,
     MaxDistance = 30.0,
     HeadingOffsetDegrees = 0.0, -- calibration if a template's forward axis differs
-    RequirePlayerControlled = true, -- use recruited companion/hireling, avoid vanilla NPC AI
+    RequirePlayerControlled = true, -- MakePlayer suppresses competing vanilla NPC AI
     OutOfCombatIntervalMs = 0, -- 0: manual !flybg3_observe only; no autonomous walking
 
     -- Physical milestone: movement is issued only after a neural action has

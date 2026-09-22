@@ -16,6 +16,16 @@ if (-not (Test-Path -LiteralPath $DivineExe -PathType Leaf)) {
 if (-not (Test-Path -LiteralPath (Join-Path $source "Mods\FlyBG3\meta.lsx") -PathType Leaf)) {
     throw "FlyBG3 source is incomplete: $source"
 }
+$rootTemplate = Join-Path $source "Public\FlyBG3\RootTemplates\_merged"
+$localization = Join-Path $source "Localization\English\FlyBG3"
+& $DivineExe -g bg3 -a convert-resource -s "$rootTemplate.lsx" -d "$rootTemplate.lsf" -o lsf
+if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath "$rootTemplate.lsf" -PathType Leaf)) {
+    throw "Divine.exe failed to compile Flyman's root template."
+}
+& $DivineExe -g bg3 -a convert-loca -s "$localization.xml" -d "$localization.loca"
+if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath "$localization.loca" -PathType Leaf)) {
+    throw "Divine.exe failed to compile Flyman's localization."
+}
 $parent = Split-Path -Parent $Output
 New-Item -ItemType Directory -Path $parent -Force | Out-Null
 & $DivineExe -g bg3 -s $source -d $Output -a create-package

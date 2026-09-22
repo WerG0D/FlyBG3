@@ -88,6 +88,7 @@ end
 function FlyBG3.requestObservation()
     local uuid = Observation.uuid(FlyBG3Config.ControlledCharacter)
     if not FlyBG3.session or not FlyBG3Config.Enabled or not uuid then return end
+    if not FlyBG3Body.isFlyman(uuid) then warn("Controlled body is not Flyman; refusing observation"); return end
     if FlyBG3.pending or FlyBG3.sampling then return end
     if not Observation.canAct(uuid) then warn("Flyman cannot act or is not player-controlled"); return end
     local session = FlyBG3.session
@@ -134,10 +135,22 @@ function FlyBG3.start()
     FlyBG3.session = tostring(Ext.Utils.GenerateGuid())
     FlyBG3.request, FlyBG3.pending, FlyBG3.sampling, FlyBG3.previous = 0, nil, false, nil
     local persisted = read("settings.json")
-    if persisted and Observation.uuid(persisted.npc_uuid) then
+    FlyBG3Config.ControlledCharacter = ""
+    if persisted and FlyBG3Body.isFlyman(persisted.npc_uuid) then
         FlyBG3Config.ControlledCharacter = Observation.uuid(persisted.npc_uuid)
+    else
+        local existing = FlyBG3Body.findExisting()
+        if existing then
+            FlyBG3Config.ControlledCharacter = existing
+            save("settings.json", {schema_version=2, npc_uuid=existing,
+                template_uuid=FlyBG3Config.BodyTemplateUUID})
+        elseif persisted and persisted.npc_uuid then
+            warn("Ignoring old binding: character is not the Flyman Mud Mephit")
+            save("settings.json", {schema_version=2})
+        end
     end
-    log("Flyman adapter loaded. UUID=" .. FlyBG3Config.ControlledCharacter)
+    log("Flyman adapter loaded. UUID=" .. (FlyBG3Config.ControlledCharacter ~= ""
+        and FlyBG3Config.ControlledCharacter or "unbound; use !flybg3_spawn"))
     heartbeatLoop(FlyBG3.session)
     autonomousLoop(FlyBG3.session)
 end
@@ -172,15 +185,35 @@ end)
 
 Ext.RegisterConsoleCommand("flybg3_bind", function(_, value)
     local uuid = Observation.uuid(value)
-    if not uuid or not Ext.Entity.Get(uuid) or Osi.IsCharacter(uuid) ~= 1 then
-        warn("Provide an existing character UUID from this save")
+    if not FlyBG3Body.isFlyman(uuid) then
+        warn("Only the mod-owned Flyman Mud Mephit can be bound; use !flybg3_spawn")
         return
     end
     FlyBG3.pending, FlyBG3.sampling = nil, false
     FlyBG3Config.ControlledCharacter = uuid
-    save("settings.json", {npc_uuid=uuid})
+    save("settings.json", {schema_version=2, npc_uuid=uuid,
+        template_uuid=FlyBG3Config.BodyTemplateUUID})
     FlyBG3.start() -- independent brain experiment for new actor
     log("Flyman bound to " .. uuid)
+end)
+Ext.RegisterConsoleCommand("flybg3_spawn", function()
+    local current = Observation.uuid(FlyBG3Config.ControlledCharacter)
+    if FlyBG3Body.isFlyman(current) then
+        warn("Flyman already exists and is bound: " .. current)
+        return
+    end
+    local uuid, reason = FlyBG3Body.spawn()
+    if not uuid then warn("Flyman spawn failed: " .. tostring(reason)); return end
+    FlyBG3Config.ControlledCharacter = uuid
+    save("settings.json", {schema_version=2, npc_uuid=uuid,
+        template_uuid=FlyBG3Config.BodyTemplateUUID})
+    FlyBG3.start()
+    log("Flyman Mud Mephit " .. (reason == "existing" and "found" or "spawned") .. " and bound: " .. uuid)
+    Ext.Timer.WaitForRealtime(500, function()
+        if FlyBG3Body.isFlyman(uuid) and Osi.IsPlayer(uuid) ~= 1 then
+            warn("Flyman exists but MakePlayer did not yield player control; cannot act")
+        end
+    end)
 end)
 Ext.RegisterConsoleCommand("flybg3_observe", function() FlyBG3.requestObservation() end)
 Ext.RegisterConsoleCommand("flybg3_stop", function()

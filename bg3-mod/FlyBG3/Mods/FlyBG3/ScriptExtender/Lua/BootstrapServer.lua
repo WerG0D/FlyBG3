@@ -1,4 +1,5 @@
 Ext.Require("Config.lua")
 Ext.Require("Observation.lua")
+Ext.Require("Body.lua")
 Ext.Require("ActionExecutor.lua")
 Ext.Require("FlyBG3.lua")
