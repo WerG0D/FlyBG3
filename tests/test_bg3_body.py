@@ -28,7 +28,7 @@ def test_flyman_is_a_separate_inherited_mud_mephit_template():
 def body_runtime():
     runtime = LuaRuntime(unpack_returned_tuples=True)
     runtime.execute(f"""
-        calls = {{created=0, make_player=0}}
+        calls = {{created=0, party_follower=0}}
         FlyBG3Config = {{
             BodyTemplateUUID="{FLYMAN_TEMPLATE}",
             BodyTemplate="FlyBG3_MudMephit_Flyman_{FLYMAN_TEMPLATE}"
@@ -41,6 +41,8 @@ def body_runtime():
             GetHostCharacter=function() return "{HOST}" end,
             IsCharacter=function(uuid) return 1 end,
             IsInCombat=function(uuid) return 0 end,
+            IsPlayer=function(uuid) return 0 end,
+            IsPartyFollower=function(uuid) return calls.party_follower end,
             GetTemplate=function(uuid)
                 if uuid == "{CREATED}" then return FlyBG3Config.BodyTemplate end
                 return "Avatar_11111111-1111-4111-8111-111111111111"
@@ -51,9 +53,9 @@ def body_runtime():
                 calls.created = calls.created + 1
                 return "{CREATED}"
             end,
-            MakePlayer=function(target, owner, reassign)
-                assert(target == "{CREATED}" and owner == "{HOST}" and reassign == 0)
-                calls.make_player = calls.make_player + 1
+            AddPartyFollower=function(target, owner)
+                assert(target == "{CREATED}" and owner == "{HOST}")
+                calls.party_follower = calls.party_follower + 1
             end
         }}
     """)
@@ -62,7 +64,7 @@ def body_runtime():
     return runtime
 
 
-def test_spawn_uses_separate_body_and_never_recruits_host():
+def test_spawn_uses_separate_party_follower_and_never_recruits_host():
     runtime = body_runtime()
     assert runtime.globals().FlyBG3Body["isFlyman"](HOST) is False
     uuid, status = runtime.globals().FlyBG3Body["spawn"]()
@@ -70,7 +72,7 @@ def test_spawn_uses_separate_body_and_never_recruits_host():
     assert status == "created"
     assert runtime.globals().FlyBG3Body["isFlyman"](uuid) is True
     assert runtime.globals().calls["created"] == 1
-    assert runtime.globals().calls["make_player"] == 1
+    assert runtime.globals().calls["party_follower"] == 1
 
 
 def test_spawn_refuses_combat_without_creating_npc():
@@ -93,7 +95,20 @@ def test_spawn_reuses_existing_flyman_instead_of_duplicating():
     assert uuid == CREATED
     assert status == "existing"
     assert runtime.globals().calls["created"] == 0
-    assert runtime.globals().calls["make_player"] == 0
+    assert runtime.globals().calls["party_follower"] == 1
+
+
+def test_observation_requires_party_control_but_accepts_party_follower():
+    runtime = body_runtime()
+    runtime.execute("""
+        FlyBG3Config.RequirePartyControl = true
+        Osi.IsDead=function(_) return 0 end
+        Osi.GetHitpoints=function(_) return 10 end
+        Osi.IsInteractionDisabled=function(_) return 0 end
+    """)
+    assert runtime.globals().Observation["canAct"](CREATED) is False
+    runtime.execute("calls.party_follower = 1")
+    assert runtime.globals().Observation["canAct"](CREATED) is True
 
 
 def test_legacy_avatar_binding_cannot_reactivate_on_load():
@@ -136,3 +151,7 @@ def test_legacy_avatar_binding_cannot_reactivate_on_load():
     runtime.globals().console["flybg3_spawn"]("flybg3_spawn")
     assert runtime.globals().FlyBG3Config["ControlledCharacter"] == CREATED
     assert runtime.globals().writes["FlyBG3/settings.json"]["npc_uuid"] == CREATED
+    runtime.execute("calls.party_follower = 0")
+    runtime.globals().console["flybg3_spawn"]("flybg3_spawn")
+    assert runtime.globals().calls["created"] == 1
+    assert runtime.globals().calls["party_follower"] == 1

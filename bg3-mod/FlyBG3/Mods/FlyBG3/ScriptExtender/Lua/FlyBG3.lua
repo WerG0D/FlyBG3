@@ -90,7 +90,7 @@ function FlyBG3.requestObservation()
     if not FlyBG3.session or not FlyBG3Config.Enabled or not uuid then return end
     if not FlyBG3Body.isFlyman(uuid) then warn("Controlled body is not Flyman; refusing observation"); return end
     if FlyBG3.pending or FlyBG3.sampling then return end
-    if not Observation.canAct(uuid) then warn("Flyman cannot act or is not player-controlled"); return end
+    if not Observation.canAct(uuid) then warn("Flyman cannot act or is not party-controlled"); return end
     local session = FlyBG3.session
     FlyBG3.request = FlyBG3.request + 1
     local rid = FlyBG3.request
@@ -169,6 +169,12 @@ Ext.Osiris.RegisterListener("TurnEnded", 1, "after", function(character)
         FlyBG3.request = FlyBG3.request + 1 -- invalidates in-flight sample callbacks
     end
 end)
+Ext.Osiris.RegisterListener("CharacterJoinedParty", 1, "after", function(character)
+    if FlyBG3Body.isFlyman(character) then
+        log("Flyman joined party; follower=" .. tostring(Osi.IsPartyFollower(character)) ..
+            ", player=" .. tostring(Osi.IsPlayer(character)))
+    end
+end)
 Ext.Osiris.RegisterListener("EntityEvent", 2, "after", function(object, event)
     local completion = ActionExecutor.consumeArrival(object, event)
     if completion then
@@ -199,7 +205,15 @@ end)
 Ext.RegisterConsoleCommand("flybg3_spawn", function()
     local current = Observation.uuid(FlyBG3Config.ControlledCharacter)
     if FlyBG3Body.isFlyman(current) then
-        warn("Flyman already exists and is bound: " .. current)
+        local attached, reason = FlyBG3Body.attach(current)
+        if not attached then warn("Flyman reattach failed: " .. tostring(reason)); return end
+        log("Flyman already exists; party control " .. tostring(reason) .. ": " .. current)
+        Ext.Timer.WaitForRealtime(FlyBG3Config.PartyControlCheckDelayMs, function()
+            if FlyBG3Body.isFlyman(current) and Osi.IsPartyFollower(current) ~= 1
+                    and Osi.IsPlayer(current) ~= 1 then
+                warn("Flyman still has no party control; observation remains disabled")
+            end
+        end)
         return
     end
     local uuid, reason = FlyBG3Body.spawn()
@@ -209,9 +223,10 @@ Ext.RegisterConsoleCommand("flybg3_spawn", function()
         template_uuid=FlyBG3Config.BodyTemplateUUID})
     FlyBG3.start()
     log("Flyman Mud Mephit " .. (reason == "existing" and "found" or "spawned") .. " and bound: " .. uuid)
-    Ext.Timer.WaitForRealtime(500, function()
-        if FlyBG3Body.isFlyman(uuid) and Osi.IsPlayer(uuid) ~= 1 then
-            warn("Flyman exists but MakePlayer did not yield player control; cannot act")
+    Ext.Timer.WaitForRealtime(FlyBG3Config.PartyControlCheckDelayMs, function()
+        if FlyBG3Body.isFlyman(uuid) and Osi.IsPartyFollower(uuid) ~= 1
+                and Osi.IsPlayer(uuid) ~= 1 then
+            warn("Flyman still has no party control; observation remains disabled")
         end
     end)
 end)

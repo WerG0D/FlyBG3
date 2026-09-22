@@ -110,7 +110,7 @@ O instalador copia somente `build\FlyBG3.pak` para `%LOCALAPPDATA%\Larian Studio
    Para iniciar pelo launcher PowerShell com logs detalhados, use `.\scripts\run_bridge.ps1 -VerboseLogging` (o nome evita conflito com o parâmetro comum `-Debug` do PowerShell).
 
 2. Abra BG3, carregue um save e use o console server-side do Script Extender.
-3. Fora de combate, crie o corpo próprio do Flyman: `!flybg3_spawn`. O mod usa um novo template herdado de `MEPHIT_Mud_A`, com visual de Mud Mephit, e o atribui ao host como personagem controlável para evitar decisões concorrentes da IA padrão. O seu avatar não é alterado.
+3. Fora de combate, crie ou recupere o corpo próprio do Flyman: `!flybg3_spawn`. O mod usa um novo template herdado de `MEPHIT_Mud_A`, com visual de Mud Mephit, e solicita `AddPartyFollower` para vinculá-lo ao avatar host como seguidor controlável. O seu avatar não é alterado.
 4. O console deve mostrar `Flyman Mud Mephit spawned and bound: <UUID real do save>`. Anote esse UUID se tiver definido `FLYBG3_NPC_UUID` ou `[bridge].npc_uuid`: atualize o filtro ou deixe-o vazio.
 5. Fora de combate, dispare uma observação manual com `!flybg3_observe`. Em combate, `TurnStarted` dispara automaticamente para o corpo do Flyman.
 
@@ -139,7 +139,7 @@ O UUID da instância criada fica em `settings.json` nesse diretório. O mod só 
 
 O template de Flyman herda o `MEPHIT_Mud_A` extraído do `Shared.pak` instalado; usa seus recursos visuais, animações e stats, e recebe nome localizado próprio. `scripts/build_mod.ps1` compila o root template para `_merged.lsf` e a tradução para `.loca` usando LSLib antes de empacotar. O BG3 Toolkit está instalado nesta máquina, mas a interface exige o DLC separado **BG3 Toolkit Data**. A pasta `Data\Editor` contém apenas `Config`, não os dados do DLC; por isso o recurso foi preparado e compilado por LSLib, sem alegar validação no editor. Para abri-lo no Toolkit, habilite BG3 Toolkit Data nas propriedades de Baldur's Gate 3 → DLC no Steam e aguarde o download. A [instalação oficial do Toolkit](https://docs.baldursgate3.game/Getting_Started%3A_Installing_the_Toolkit) explica essa dependência.
 
-O código e o pacote foram testados localmente, mas a criação do Mud Mephit e `MakePlayer` ainda precisam de validação no seu save. Faça um save separado antes de `!flybg3_spawn`, pois a criatura é persistente e ganha retrato na party. Consulte [a nota de implementação](docs/MUD_MEPHIT.md) para os comandos e limites do teste.
+O usuário confirmou que o corpo Mud Mephit foi criado no save. A tentativa inicial com `MakePlayer` não produziu controle de jogador; a versão atual usa `AddPartyFollower`, ainda pendente de teste no jogo. Faça um save separado antes de `!flybg3_spawn`, pois a criatura é persistente e um seguidor costuma aparecer junto ao retrato do líder. Repetir o comando tenta anexar a criatura existente, sem duplicá-la. Consulte [a nota de implementação](docs/MUD_MEPHIT.md) para os comandos e limites do teste.
 
 ## Primeiro movimento físico
 

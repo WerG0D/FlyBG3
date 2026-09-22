@@ -25,7 +25,8 @@ function Observation.canAct(uuid)
     if not Ext.Entity.Get(uuid) or Osi.IsCharacter(uuid) ~= 1 then return false end
     if Osi.IsDead(uuid) == 1 or (Osi.GetHitpoints(uuid) or 0) <= 0 then return false end
     if Osi.IsInteractionDisabled(uuid) == 1 then return false end
-    if FlyBG3Config.RequirePlayerControlled and Osi.IsPlayer(uuid) ~= 1 then return false end
+    if FlyBG3Config.RequirePartyControl and Osi.IsPlayer(uuid) ~= 1
+            and Osi.IsPartyFollower(uuid) ~= 1 then return false end
     if Osi.IsInCombat(uuid) == 1 and not Observation.myTurn(uuid) then return false end
     return true
 end

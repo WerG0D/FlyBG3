@@ -17,9 +17,32 @@ function FlyBG3Body.findExisting()
     return nil
 end
 
+function FlyBG3Body.attach(uuid)
+    if not FlyBG3Body.isFlyman(uuid) then return false, "not_flyman" end
+    local okHost, host = pcall(Osi.GetHostCharacter)
+    local hostUuid = okHost and Observation.uuid(host) or nil
+    if not hostUuid or not Ext.Entity.Get(hostUuid) or Osi.IsCharacter(hostUuid) ~= 1 then
+        return false, "host_character_unavailable"
+    end
+    if Osi.IsInCombat(hostUuid) == 1 then return false, "attach_outside_combat_only" end
+    if Osi.IsPartyFollower(uuid) == 1 or Osi.IsPlayer(uuid) == 1 then
+        return true, "already_controlled"
+    end
+
+    -- A party follower is controllable like a summon. Unlike MakePlayer,
+    -- this route is meant for a creature that is not a full companion.
+    local okFollower, followerError = pcall(Osi.AddPartyFollower, uuid, hostUuid)
+    if not okFollower then return false, "AddPartyFollower_failed: " .. tostring(followerError) end
+    return true, "requested"
+end
+
 function FlyBG3Body.spawn()
     local existing = FlyBG3Body.findExisting()
-    if existing then return existing, "existing" end
+    if existing then
+        local attached, reason = FlyBG3Body.attach(existing)
+        if not attached then return nil, reason end
+        return existing, "existing"
+    end
     local okHost, host = pcall(Osi.GetHostCharacter)
     local hostUuid = okHost and Observation.uuid(host) or nil
     if not hostUuid or not Ext.Entity.Get(hostUuid) or Osi.IsCharacter(hostUuid) ~= 1 then
@@ -35,10 +58,7 @@ function FlyBG3Body.spawn()
         return nil, "spawned_template_mismatch: " .. tostring(created)
     end
 
-    -- MakePlayer assigns this *separate* creature to the host's user and
-    -- prevents vanilla NPC AI competing with neural decisions. It adds a
-    -- party portrait; the host's avatar itself is never modified.
-    local okPlayer, playerError = pcall(Osi.MakePlayer, uuid, hostUuid, 0)
-    if not okPlayer then return nil, "MakePlayer_failed for " .. uuid .. ": " .. tostring(playerError) end
+    local attached, reason = FlyBG3Body.attach(uuid)
+    if not attached then return nil, "created " .. uuid .. " but " .. tostring(reason) end
     return uuid, "created"
 end

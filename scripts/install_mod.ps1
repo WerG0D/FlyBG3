@@ -13,6 +13,9 @@ if (-not $ModsDirectory) {
 }
 $Pak = [System.IO.Path]::GetFullPath($Pak)
 $ModsDirectory = [System.IO.Path]::GetFullPath($ModsDirectory)
+if (Get-Process -Name bg3,bg3_dx11 -ErrorAction SilentlyContinue) {
+    throw "Baldur's Gate 3 is running. Close the game before replacing FlyBG3.pak."
+}
 if (-not (Test-Path -LiteralPath $Pak -PathType Leaf)) {
     throw "Package not found: $Pak. Run scripts\build_mod.ps1 first."
 }

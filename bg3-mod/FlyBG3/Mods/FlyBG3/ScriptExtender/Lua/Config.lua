@@ -10,7 +10,8 @@ FlyBG3Config = {
     SampleIntervalMs = 200,
     MaxDistance = 30.0,
     HeadingOffsetDegrees = 0.0, -- calibration if a template's forward axis differs
-    RequirePlayerControlled = true, -- MakePlayer suppresses competing vanilla NPC AI
+    RequirePartyControl = true, -- player or party follower; never act as vanilla NPC
+    PartyControlCheckDelayMs = 1500, -- allow CharacterJoinedParty to arrive before warning
     OutOfCombatIntervalMs = 0, -- 0: manual !flybg3_observe only; no autonomous walking
 
     -- Physical milestone: movement is issued only after a neural action has
