@@ -40,21 +40,31 @@ function Observation.collect(uuid, session, request, previous)
     if not hp or not maxHp or maxHp <= 0 then error("health unavailable") end
     local now = Ext.Timer.MonotonicTime()
     local nearest, best = nil, FlyBG3Config.MaxDistance
+    local scan = {characters=0, hostile=0, in_range=0, visible=0}
     -- Once per observation, never each Tick. Uuid enumeration is a documented
     -- SE API; IsCharacter/IsEnemy/CanSee are real Osiris queries.
     for _, entity in ipairs(Ext.Entity.GetAllEntitiesWithComponent("Uuid")) do
         local target = entity.Uuid and Observation.uuid(entity.Uuid.EntityUuid)
-        if target and target ~= uuid and entity.ServerCharacter and Osi.IsDead(target) == 0
-                and Osi.IsEnemy(uuid, target) == 1 then
-            local p = Observation.position(target)
-            local dx, dy, dz = p.x-position.x, p.y-position.y, p.z-position.z
-            local distance = math.sqrt(dx*dx + dy*dy + dz*dz)
-            if distance < best and Osi.CanSee(uuid, target) == 1 then
-                best = distance
-                -- BG3 Y up, clockwise yaw in degrees; +Z is reference forward.
-                local bearing = math.deg(math.atan(dx, dz))
-                nearest = {uuid=target, distance=distance,
-                    relative_angle=(bearing-yaw+180)%360-180, visible=true}
+        if target and target ~= uuid and entity.ServerCharacter and Osi.IsDead(target) == 0 then
+            scan.characters = scan.characters + 1
+            if Osi.IsEnemy(uuid, target) == 1 then
+                scan.hostile = scan.hostile + 1
+                local p = Observation.position(target)
+                local dx, dy, dz = p.x-position.x, p.y-position.y, p.z-position.z
+                local distance = math.sqrt(dx*dx + dy*dy + dz*dz)
+                if distance < FlyBG3Config.MaxDistance then
+                    scan.in_range = scan.in_range + 1
+                    if Osi.CanSee(uuid, target) == 1 then
+                        scan.visible = scan.visible + 1
+                        if distance < best then
+                            best = distance
+                            -- BG3 Y up, clockwise yaw in degrees; +Z is reference forward.
+                            local bearing = math.deg(math.atan(dx, dz))
+                            nearest = {uuid=target, distance=distance,
+                                relative_angle=(bearing-yaw+180)%360-180, visible=true}
+                        end
+                    end
+                end
             end
         end
     end
@@ -70,5 +80,5 @@ function Observation.collect(uuid, session, request, previous)
     return {schema_version=1, session_id=session, request_id=request, sample_time_ms=now,
         npc={uuid=uuid, hp=hp, max_hp=maxHp, position=position, heading_degrees=yaw},
         combat={active=Osi.IsInCombat(uuid)==1, my_turn=Observation.myTurn(uuid)},
-        nearest_hostile=nearest, stimuli={damage_fraction=damage}}
+        nearest_hostile=nearest, stimuli={damage_fraction=damage}}, scan
 end

@@ -3,6 +3,20 @@ local allowed = {idle=true, approach=true, retreat=true, turn_left=true, turn_ri
 local function log(message) Ext.Utils.Print("[FlyBG3] " .. message) end
 local function warn(message) Ext.Utils.PrintWarning("[FlyBG3] " .. message) end
 
+local function applyImmortality(uuid, enabled)
+    local ok, reason = FlyBG3Body.setImmortal(uuid, enabled)
+    if not ok then warn("Flyman immortality failed: " .. tostring(reason)); return end
+    Ext.Timer.WaitForRealtime(FlyBG3Config.ImmortalityVerifyDelayMs, function()
+        if not FlyBG3Body.isFlyman(uuid) then return end
+        local readOk, actual = pcall(Osi.IsImmortal, uuid)
+        if readOk and actual == (enabled and 1 or 0) then
+            log("Flyman immortality " .. (enabled and "enabled" or "disabled"))
+        else
+            warn("Flyman immortality could not be verified: " .. tostring(actual))
+        end
+    end)
+end
+
 local function finishTurn(completion)
     if not FlyBG3Config.AutoEndTurn then return end
     local uuid = completion and completion.uuid
@@ -21,6 +35,14 @@ local function read(name)
     local ok, data = pcall(Ext.Json.Parse, content)
     if ok and type(data) == "table" then return data end
     return nil
+end
+
+function FlyBG3.brainStatus(heartbeat)
+    local age = heartbeat and type(heartbeat.unix_ms) == "number"
+        and math.floor(Ext.Timer.ClockEpoch()*1000 - heartbeat.unix_ms) or -1
+    local ready = heartbeat and heartbeat.alive == true and heartbeat.brain_loaded == true
+        and age >= 0 and age <= FlyBG3Config.BrainHeartbeatMaxAgeMs
+    return ready == true, age
 end
 
 local function save(name, data)
@@ -55,7 +77,13 @@ local function poll(session, rid)
     -- Deadline checked BEFORE file, so a late response can never move an actor.
     if Ext.Timer.MonotonicTime() >= p.deadline then
         FlyBG3.pending = nil
-        warn("Decision timeout #" .. rid .. "; IDLE (log-only mode)")
+        local heartbeat = read("heartbeat_brain.json")
+        local ready = FlyBG3.brainStatus(heartbeat)
+        if not ready then
+            warn("Brain bridge offline/stale for observation #" .. rid .. "; IDLE")
+        else
+            warn("Decision timeout #" .. rid .. "; IDLE")
+        end
         return
     end
     local response = read("action.json")
@@ -101,8 +129,13 @@ function FlyBG3.requestObservation()
         if FlyBG3.session ~= session or FlyBG3.request ~= rid then return end
         FlyBG3.sampling = false
         if not FlyBG3Config.Enabled or not Observation.canAct(uuid) then return end
-        local collected, observation = pcall(Observation.collect, uuid, session, rid, first)
+        local collected, observation, scan = pcall(Observation.collect, uuid, session, rid, first)
         if not collected then warn("Observation failed: " .. tostring(observation)); return end
+        if FlyBG3Config.Debug and scan then
+            log("Sensory scan #" .. rid .. ": characters=" .. scan.characters ..
+                ", hostile=" .. scan.hostile .. ", in_range=" .. scan.in_range ..
+                ", visible=" .. scan.visible)
+        end
         observation.stimuli.damage_fraction = math.min(1, first.stimuli.damage_fraction + observation.stimuli.damage_fraction)
         FlyBG3.previous = observation
         local written, reason = pcall(function()
@@ -151,6 +184,9 @@ function FlyBG3.start()
     end
     log("Flyman adapter loaded. UUID=" .. (FlyBG3Config.ControlledCharacter ~= ""
         and FlyBG3Config.ControlledCharacter or "unbound; use !flybg3_spawn"))
+    if FlyBG3Config.ControlledCharacter ~= "" and FlyBG3Config.ImmortalForTesting then
+        applyImmortality(FlyBG3Config.ControlledCharacter, true)
+    end
     heartbeatLoop(FlyBG3.session)
     autonomousLoop(FlyBG3.session)
 end
@@ -207,6 +243,7 @@ Ext.RegisterConsoleCommand("flybg3_spawn", function()
     if FlyBG3Body.isFlyman(current) then
         local attached, reason = FlyBG3Body.attach(current)
         if not attached then warn("Flyman reattach failed: " .. tostring(reason)); return end
+        if FlyBG3Config.ImmortalForTesting then applyImmortality(current, true) end
         log("Flyman already exists; party control " .. tostring(reason) .. ": " .. current)
         Ext.Timer.WaitForRealtime(FlyBG3Config.PartyControlCheckDelayMs, function()
             if FlyBG3Body.isFlyman(current) and Osi.IsPartyFollower(current) ~= 1
@@ -231,6 +268,16 @@ Ext.RegisterConsoleCommand("flybg3_spawn", function()
     end)
 end)
 Ext.RegisterConsoleCommand("flybg3_observe", function() FlyBG3.requestObservation() end)
+Ext.RegisterConsoleCommand("flybg3_status", function()
+    local uuid = Observation.uuid(FlyBG3Config.ControlledCharacter)
+    local follower = uuid and FlyBG3Body.isFlyman(uuid) and Osi.IsPartyFollower(uuid) or 0
+    local immortal = uuid and FlyBG3Body.isFlyman(uuid) and Osi.IsImmortal(uuid) or 0
+    local brain = read("heartbeat_brain.json")
+    local healthy, age = FlyBG3.brainStatus(brain)
+    log("Status: body=" .. tostring(uuid or "unbound") .. ", follower=" .. tostring(follower) ..
+        ", immortal=" .. tostring(immortal) .. ", brain=" .. (healthy and "ready" or "offline") ..
+        ", heartbeat_age_ms=" .. tostring(age))
+end)
 Ext.RegisterConsoleCommand("flybg3_stop", function()
     FlyBG3Config.Enabled = false
     FlyBG3.pending, FlyBG3.sampling = nil, false
@@ -247,6 +294,17 @@ Ext.RegisterConsoleCommand("flybg3_physical", function(_, value)
     local enabled = tostring(value or ""):lower() == "on"
     FlyBG3Config.PhysicalActionsEnabled = enabled
     log("Physical actions " .. (enabled and "enabled" or "disabled"))
+end)
+Ext.RegisterConsoleCommand("flybg3_immortal", function(_, value)
+    local option = tostring(value or ""):lower()
+    if option ~= "on" and option ~= "off" then
+        warn("Usage: !flybg3_immortal on|off")
+        return
+    end
+    local uuid = Observation.uuid(FlyBG3Config.ControlledCharacter)
+    if not FlyBG3Body.isFlyman(uuid) then warn("Flyman body unavailable"); return end
+    FlyBG3Config.ImmortalForTesting = option == "on"
+    applyImmortality(uuid, FlyBG3Config.ImmortalForTesting)
 end)
 Ext.RegisterConsoleCommand("flybg3_combat_move", function(_, value)
     local enabled = tostring(value or ""):lower() == "on"

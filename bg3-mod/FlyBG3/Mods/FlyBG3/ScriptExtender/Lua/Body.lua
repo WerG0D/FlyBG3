@@ -36,6 +36,13 @@ function FlyBG3Body.attach(uuid)
     return true, "requested"
 end
 
+function FlyBG3Body.setImmortal(uuid, enabled)
+    if not FlyBG3Body.isFlyman(uuid) then return false, "not_flyman" end
+    local ok, reason = pcall(Osi.SetImmortal, uuid, enabled and 1 or 0)
+    if not ok then return false, "SetImmortal_failed: " .. tostring(reason) end
+    return true
+end
+
 function FlyBG3Body.spawn()
     local existing = FlyBG3Body.findExisting()
     if existing then

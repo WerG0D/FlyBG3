@@ -114,6 +114,8 @@ O instalador copia somente `build\FlyBG3.pak` para `%LOCALAPPDATA%\Larian Studio
 4. O console deve mostrar `Flyman Mud Mephit spawned and bound: <UUID real do save>`. Anote esse UUID se tiver definido `FLYBG3_NPC_UUID` ou `[bridge].npc_uuid`: atualize o filtro ou deixe-o vazio.
 5. Fora de combate, dispare uma observação manual com `!flybg3_observe`. Em combate, `TurnStarted` dispara automaticamente para o corpo do Flyman.
 
+O bridge Python precisa permanecer em execução enquanto BG3 envia observações. Use `!flybg3_status` para conferir `brain=ready` e a idade do heartbeat antes do teste. Se aparecer `brain=offline`, inicie `python -m flybg3 --config config\default.toml` e tente uma nova observação; respostas antigas nunca são reutilizadas.
+
 Saída esperada no console:
 
 ```text
@@ -139,7 +141,7 @@ O UUID da instância criada fica em `settings.json` nesse diretório. O mod só 
 
 O template de Flyman herda o `MEPHIT_Mud_A` extraído do `Shared.pak` instalado; usa seus recursos visuais, animações e stats, e recebe nome localizado próprio. `scripts/build_mod.ps1` compila o root template para `_merged.lsf` e a tradução para `.loca` usando LSLib antes de empacotar. O BG3 Toolkit está instalado nesta máquina, mas a interface exige o DLC separado **BG3 Toolkit Data**. A pasta `Data\Editor` contém apenas `Config`, não os dados do DLC; por isso o recurso foi preparado e compilado por LSLib, sem alegar validação no editor. Para abri-lo no Toolkit, habilite BG3 Toolkit Data nas propriedades de Baldur's Gate 3 → DLC no Steam e aguarde o download. A [instalação oficial do Toolkit](https://docs.baldursgate3.game/Getting_Started%3A_Installing_the_Toolkit) explica essa dependência.
 
-O usuário confirmou que o corpo Mud Mephit foi criado no save. A tentativa inicial com `MakePlayer` não produziu controle de jogador; a versão atual usa `AddPartyFollower`, ainda pendente de teste no jogo. Faça um save separado antes de `!flybg3_spawn`, pois a criatura é persistente e um seguidor costuma aparecer junto ao retrato do líder. Repetir o comando tenta anexar a criatura existente, sem duplicá-la. Consulte [a nota de implementação](docs/MUD_MEPHIT.md) para os comandos e limites do teste.
+O usuário confirmou que o corpo Mud Mephit foi criado no save e que `AddPartyFollower` retornou `follower=1` e deu turno ao Flyman. A tentativa inicial com `MakePlayer` não produziu controle de jogador. Faça um save separado antes de `!flybg3_spawn`, pois a criatura é persistente e um seguidor costuma aparecer junto ao retrato do líder. Repetir o comando tenta anexar a criatura existente, sem duplicá-la. A decisão neural no novo corpo ainda precisa de teste com o bridge Python ligado. Consulte [a nota de implementação](docs/MUD_MEPHIT.md) para os comandos e limites do teste.
 
 ## Primeiro movimento físico
 
@@ -156,7 +158,12 @@ Comandos de controle no console server-side:
 !flybg3_combat_move off
 !flybg3_auto_end on      # encerra após IDLE ou depois do evento de chegada
 !flybg3_auto_end off
+!flybg3_status           # corpo, party follower, imortalidade e heartbeat do bridge
+!flybg3_immortal on      # imortalidade apenas para o template Flyman
+!flybg3_immortal off
 ```
+
+`ImmortalForTesting = true` habilita `SetImmortal` no Flyman ao carregar o save. A opção é destinada a testes e não revive uma criatura já morta. `!flybg3_immortal off` reverte durante a sessão; ao recarregar o mod, o padrão volta a ser aplicado.
 
 Se uma decisão neural for produzida sem alvo/dano atual, o console registra `Physical action skipped` e o personagem permanece parado. Isso preserva a atividade espontânea do connectome para o experimento sem transformar tonicidade em movimento inesperado.
 
