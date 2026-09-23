@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<save>
+    <version major="4" minor="8" revision="0" build="500"/>
+    <region id="MetaData">
+        <node id="root">
+            <attribute id="GameProject" type="LSString" value=""/>
+            <attribute id="Module" type="LSString" value="00a41563-37f2-988d-98c9-5ca9bb65423a"/>
+            <attribute id="Name" type="LSString" value="FlyBG3Arena"/>
+            <attribute id="UUID" type="LSString" value="30c85fb8-dd17-c235-1283-915bb6550f9e"/>
+            <attribute id="UpdatedDependencies" type="bool" value="true"/>
+            <children>
+                <node id="Categories"/>
+            </children>
+        </node>
+    </region>
+</save>
