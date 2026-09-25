@@ -32,4 +32,6 @@ O diagnóstico offline [`experiments/feature_diagnostics_C.json`](../experiments
 
 O currículo D, iniciado a partir do checkpoint A com `ε=0,7`, teve 10/40 vitórias **durante exploração**. A avaliação posterior com ε=0 perdeu 8/8: as 176 ações foram `IDLE`, sem causar dano. O caminho vencedor `APPROACH` seguido de `BASIC_ATTACK` é possível e está coberto por teste, mas o readout TD de um passo não o preservou. Isso é um **resultado negativo de aprendizado**, não uma falha de conexão ao MaleCNS. Os detalhes estão em `runtime/lab-runs/run_manual_e1f0f7c2` e no resumo [`experiments/continuation.json`](../experiments/continuation.json).
 
+Na avaliação pareada do mesmo checkpoint D, zerar ou embaralhar as taxas de DNs não mudou nenhuma das 176 ações: `IDLE` em 8/8 episódios para ambas as ablações, mesmo resultado/reward do readout normal. Portanto, **a política final não demonstrou dependência funcional das features neurais** nesse teste. Não ativamos ataque físico no BG3 com essa política.
+
 Conclusão: `INCONCLUSIVE`. Não há base para afirmar aprendizado de combate neural generalizável, nem para ativar `BASIC_ATTACK` no BG3. A próxima avaliação exige alternância entre aproximação e ataque, seguida de ablações e repetição em mais seeds.
