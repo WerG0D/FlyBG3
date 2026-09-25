@@ -62,6 +62,14 @@ class Simulation:
             try:
                 record["telemetry"] = observer.snapshot(observation, action.action.upper(),
                                                          timings["simulation_ms"]).to_dict()
+                if self.config.dashboard.enabled:
+                    from flybg3.telemetry.connectome import active_snapshot
+                    visual_start = perf_counter()
+                    record["visualization"] = active_snapshot(
+                        self.brain.brain, observer.active,
+                        self.config.dashboard.max_active_neurons,
+                        self.config.dashboard.max_edges)
+                    timings["visualization_ms"] = 1000 * (perf_counter() - visual_start)
             except Exception:
                 LOG.exception("Telemetry snapshot unavailable; neural decision continues")
         return action, record

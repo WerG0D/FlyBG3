@@ -26,11 +26,18 @@ class ArenaState:
 class CombatArena:
     """Synthetic environment for software/ablation tests, never BG3 evidence."""
 
-    def __init__(self, seed: int, max_turns: int = 24):
+    def __init__(self, seed: int, max_turns: int = 24, opponent: str = "A"):
+        if opponent not in {"A", "B", "C", "D"}:
+            raise ValueError("unknown arena opponent")
         self.rng = random.Random(seed)
         self.max_turns = max_turns
-        self.state = ArenaState(22, 22, self.rng.randint(14, 20), 20,
-                                self.rng.uniform(2.0, 6.0))
+        self.opponent = opponent
+        hp_range = (24, 30) if opponent == "B" else (6, 10) if opponent == "D" else (14, 20)
+        distance_range = ((4.0, 8.0) if opponent == "B" else
+                          (3.0, 7.0) if opponent == "C" else
+                          (2.0, 3.5) if opponent == "D" else (2.0, 6.0))
+        self.state = ArenaState(22, 22, self.rng.randint(*hp_range), 20,
+                                self.rng.uniform(*distance_range))
         self.state.enemy_max_hp = self.state.enemy_hp
 
     def observation(self, session_id: str, request_id: int) -> dict:
@@ -68,14 +75,22 @@ class CombatArena:
             status, reason = "invalid", "unknown_action"
         killed = s.enemy_hp <= 0
         if not killed:
-            if s.distance > 1.5:
-                s.distance = max(0.5, s.distance - 1.0)
+            if self.opponent in {"C", "D"}:
+                # Kiting opponent: repeated out-of-range attacks never close
+                # the gap; a useful policy must switch between approach/attack.
+                s.flyman_hp = max(0, s.flyman_hp - (1 if self.opponent == "D"
+                                                   else self.rng.randint(1, 2)))
+                if s.distance > 1.5:
+                    s.distance = min(8.0, s.distance + (0.25 if self.opponent == "D" else 0.5))
+            elif s.distance > 1.5:
+                s.distance = max(0.5, s.distance - (1.0 if self.opponent == "A" else 1.25))
             else:
-                s.flyman_hp = max(0, s.flyman_hp - self.rng.randint(2, 5))
+                s.flyman_hp = max(0, s.flyman_hp - self.rng.randint(
+                    *(2, 5) if self.opponent == "A" else (3, 7)))
         s.turn += 1
         s.previous_hp, s.previous_distance = before_hp, before_distance
         dead = s.flyman_hp <= 0
         timed_out = s.turn >= self.max_turns and not (killed or dead)
         result = "victory" if killed else "defeat" if dead else "timeout" if timed_out else None
         return CombatOutcome(status, reason, dealt, before_hp - s.flyman_hp,
-                             killed, dead, killed, dead), result is not None, result
+                             killed, dead, killed, dead, timed_out), result is not None, result

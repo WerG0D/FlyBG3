@@ -1,6 +1,7 @@
 from __future__ import annotations
 import argparse
 import logging
+from pathlib import Path
 from uuid import uuid4
 from . import __version__
 from .config import load_config
@@ -9,7 +10,7 @@ from .bridge.atomic_io import atomic_write_json
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Frozen MaleCNS -> BG3 filesystem bridge")
-    parser.add_argument("command", nargs="?", choices=["telemetry", "speech-test"],
+    parser.add_argument("command", nargs="?", choices=["telemetry", "speech-test", "arena", "validate-learning", "generalize", "dashboard", "export-connectome"],
                         help="Read-only monitor or standalone Windows voice check")
     parser.add_argument("--config")
     parser.add_argument("--directory")
@@ -17,8 +18,23 @@ def main() -> None:
     parser.add_argument("--reset", action="store_true", help="Request manual reset in running bridge")
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--speech", action="store_true", help="Enable optional neural speech for this bridge run")
+    parser.add_argument("--mode", choices=["observe", "validate", "train", "eval"])
+    parser.add_argument("--policy", choices=["random", "frozen", "trainable", "shuffled", "zero"])
+    parser.add_argument("--opponent", choices=["A", "B", "C", "D"], default="A",
+                        help="Synthetic arena opponent for arena training/evaluation")
+    parser.add_argument("--exploration", type=float,
+                        help="Override epsilon for a training run; logged in its manifest")
+    parser.add_argument("--episodes", type=int, default=1)
+    parser.add_argument("--train-episodes", type=int, default=4)
+    parser.add_argument("--eval-episodes", type=int, default=2)
+    parser.add_argument("--seeds", type=int, nargs="+", default=[42, 43, 44])
+    parser.add_argument("--output", type=Path)
+    parser.add_argument("--input", type=Path)
+    parser.add_argument("--checkpoint", type=Path,
+                        help="Resume the neural readout from this checkpoint (arena train/eval)")
     args = parser.parse_args()
-    config = load_config(args.config)
+    lab_command = args.command in {"arena", "validate-learning", "generalize", "dashboard", "export-connectome"}
+    config = load_config(args.config or ("config/combat-lab.toml" if lab_command else None))
     if args.directory:
         config.bridge.directory = args.directory
     if args.speech:
@@ -26,6 +42,46 @@ def main() -> None:
     logging.basicConfig(level="DEBUG" if args.debug else config.bridge.log_level,
                         format="[FlyBG3] %(levelname)s: %(message)s")
     print(f"FlyBG3 {__version__}", flush=True)
+    if args.command == "dashboard":
+        from .combat.dashboard_server import run_dashboard_server
+        run_dashboard_server(config.dashboard.host, config.dashboard.port)
+        return
+    if args.command == "export-connectome":
+        from .brain.fly_brain import FlyBrainAdapter
+        from .telemetry.connectome import structural_sample
+        import json
+        config.dashboard.enabled = True
+        brain = FlyBrainAdapter(config).brain
+        output = args.output or Path("dashboard/public/connectome.json")
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(json.dumps(structural_sample(brain), separators=(",", ":")), encoding="utf-8")
+        print(f"Anatomical sample: {output}", flush=True)
+        return
+    if args.command == "generalize":
+        from .combat.experiment import evaluate_generalization
+        output = args.output or Path("experiments/generalization.json")
+        result = evaluate_generalization(config, args.input or Path("experiments/learning_validation.json"),
+                                        args.eval_episodes, output)
+        print(f"Generalization: {result['conclusion']}\nResults: {output}", flush=True)
+        return
+    if args.command in {"arena", "validate-learning"}:
+        from .combat.experiment import run_control, validate_learning
+        if args.command == "validate-learning":
+            output = args.output or Path("experiments/learning_validation.json")
+            result = validate_learning(config, tuple(args.seeds), args.train_episodes,
+                                       args.eval_episodes, output, runs_root=Path("runtime/lab-runs"))
+            print(f"Validation: {result['conclusion']}\nResults: {output}", flush=True)
+        else:
+            name = args.policy or config.combat.policy
+            mode = args.mode or config.combat.mode
+            root = Path("runtime/lab-runs") / f"run_manual_{uuid4().hex[:8]}"
+            result = run_control(config, name, config.brain.seed,
+                                 args.episodes if mode == "train" else 0,
+                                 args.episodes if mode != "train" else args.eval_episodes,
+                                 root=root, checkpoint=args.checkpoint,
+                                 opponent=args.opponent, exploration=args.exploration)
+            print(f"Arena {name} {mode}: {result['evaluation']}\nRun: {root}", flush=True)
+        return
     if args.command == "speech-test":
         from .speech.tts import NullTTSProvider, make_provider
         provider = make_provider(config.speech)

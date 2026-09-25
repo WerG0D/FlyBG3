@@ -22,6 +22,12 @@ class FlyBrainAdapter:
         self.config = config
         self.brain = FlyBrain(data=config.brain.data or None, seed=config.brain.seed,
                               device=config.performance.device, batch=1, dt=config.brain.dt)
+        # Display metadata only: `FlyBrain` exposes array indices/positions but
+        # not MaleCNS body IDs. Loading IDs does not touch dynamics or weights.
+        if config.dashboard.enabled:
+            from flybrain.data import ensure_data
+            with np.load(ensure_data(config.brain.data or None) / "brain.npz") as meta:
+                self.brain.ids = meta["ids"]
         self.groups = resolve_groups(self.brain)
         self.decoder_motor = {k: v for k, v in self.groups.items() if k.split("_")[0] in MOTOR_TYPES}
         self.candidate_motor = resolve_candidate_groups(self.brain)

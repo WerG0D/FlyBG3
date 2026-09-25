@@ -53,6 +53,7 @@ class CombatOutcome:
     self_death: bool = False
     victory: bool = False
     defeat: bool = False
+    timeout: bool = False
 
 
 @dataclass(frozen=True)
@@ -64,6 +65,7 @@ class RewardBreakdown:
     victory: float = 0.0
     defeat: float = 0.0
     invalid: float = 0.0
+    timeout: float = 0.0
 
     @property
     def total(self) -> float:
@@ -77,6 +79,7 @@ class RewardBreakdown:
 class CombatEpisode:
     episode_id: int
     started_at: str
+    initial_state: dict = field(default_factory=dict)
     ended_at: str | None = None
     result: str | None = None
     transitions: list[dict] = field(default_factory=list)
@@ -88,6 +91,14 @@ class CombatEpisode:
     @property
     def turn_count(self) -> int:
         return len(self.transitions)
+
+    @property
+    def actions(self) -> list[str]:
+        return [step["action"] for step in self.transitions]
+
+    @property
+    def rewards(self) -> list[float]:
+        return [step["reward"]["total"] for step in self.transitions]
 
     def add(self, transition: dict, outcome: CombatOutcome, reward: RewardBreakdown) -> None:
         if self.ended_at is not None:

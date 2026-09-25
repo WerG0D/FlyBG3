@@ -5,6 +5,7 @@ import os
 import tomllib
 from dataclasses import dataclass, field, fields
 from pathlib import Path
+from flybg3.combat.reward import RewardConfig
 
 
 @dataclass
@@ -94,6 +95,28 @@ class SpeechConfig:
 
 
 @dataclass
+class CombatConfig:
+    mode: str = "observe" # observe | validate | train | eval
+    physical_actions_enabled: bool = False
+    policy: str = "trainable" # trainable | frozen | random
+    learning_rate: float = 0.05
+    discount: float = 0.9
+    epsilon: float = 0.2
+    epsilon_decay: float = 0.995
+    epsilon_floor: float = 0.02
+    max_turns: int = 24
+
+
+@dataclass
+class DashboardConfig:
+    enabled: bool = False
+    host: str = "127.0.0.1"
+    port: int = 8765
+    max_active_neurons: int = 300
+    max_edges: int = 200
+
+
+@dataclass
 class Config:
     brain: BrainConfig = field(default_factory=BrainConfig)
     encoder: EncoderConfig = field(default_factory=EncoderConfig)
@@ -102,11 +125,15 @@ class Config:
     bridge: BridgeConfig = field(default_factory=BridgeConfig)
     telemetry: TelemetryConfig = field(default_factory=TelemetryConfig)
     speech: SpeechConfig = field(default_factory=SpeechConfig)
+    combat: CombatConfig = field(default_factory=CombatConfig)
+    reward: RewardConfig = field(default_factory=RewardConfig)
+    dashboard: DashboardConfig = field(default_factory=DashboardConfig)
 
     def validate(self) -> None:
         import math
         for section in (self.brain, self.encoder, self.decoder, self.performance, self.bridge,
-                        self.telemetry, self.telemetry.scale, self.speech, self.speech.voice):
+                        self.telemetry, self.telemetry.scale, self.speech, self.speech.voice,
+                        self.combat, self.reward, self.dashboard):
             defaults = type(section)()
             for f in fields(section):
                 v, default = getattr(section, f.name), getattr(defaults, f.name)
@@ -160,6 +187,18 @@ class Config:
             raise ValueError("speech.min_confidence must be in [0,1]")
         if not -10 <= self.speech.voice.rate <= 10 or not 0 <= self.speech.voice.volume <= 100:
             raise ValueError("speech voice rate or volume out of range")
+        if self.combat.mode not in {"observe", "validate", "train", "eval"}:
+            raise ValueError("invalid combat.mode")
+        if self.combat.policy not in {"trainable", "frozen", "random"}:
+            raise ValueError("invalid combat.policy")
+        if not 0 < self.combat.learning_rate <= 1 or not 0 <= self.combat.discount <= 1:
+            raise ValueError("invalid combat learning parameters")
+        if not 0 <= self.combat.epsilon_floor <= self.combat.epsilon <= 1 or not 0 < self.combat.epsilon_decay <= 1:
+            raise ValueError("invalid combat exploration parameters")
+        if self.combat.max_turns < 1 or not 1 <= self.dashboard.port <= 65535:
+            raise ValueError("invalid combat max_turns or dashboard port")
+        if self.dashboard.max_active_neurons < 1 or self.dashboard.max_edges < 0:
+            raise ValueError("invalid dashboard sampling limits")
 
     def directory(self) -> Path:
         if self.bridge.directory:

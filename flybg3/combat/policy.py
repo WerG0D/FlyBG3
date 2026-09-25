@@ -88,7 +88,10 @@ class TrainableNeuralReadoutPolicy:
         atomic_write_json(path, {"schema_version": 1, "algorithm": "linear_q_td", "seed": self.seed,
                                  "feature_names": FEATURE_NAMES, "actions": [a.value for a in ACTIONS],
                                  "weights": self.weights, "updates": self.updates, "episodes": self.episodes,
-                                 "epsilon": self.epsilon, "metadata": metadata})
+                                 "epsilon": self.epsilon,
+                                 "learning_rate": self.learning_rate, "discount": self.discount,
+                                 "epsilon_decay": self.epsilon_decay, "epsilon_floor": self.epsilon_floor,
+                                 "rng_state": self.rng.getstate(), "metadata": metadata})
 
     @classmethod
     def load(cls, path: Path) -> TrainableNeuralReadoutPolicy:
@@ -97,12 +100,21 @@ class TrainableNeuralReadoutPolicy:
                 or tuple(data.get("feature_names", ())) != FEATURE_NAMES
                 or data.get("actions") != [a.value for a in ACTIONS]):
             raise ValueError("incompatible policy checkpoint")
-        policy = cls(seed=data["seed"])
+        # Early v1 checkpoints stored weights/epsilon but omitted optimizer/RNG
+        # fields. They remain usable for frozen EVAL; new saves include all fields.
+        policy = cls(seed=data["seed"], learning_rate=data.get("learning_rate", 0.05),
+                     discount=data.get("discount", 0.9), epsilon=data["epsilon"],
+                     epsilon_decay=data.get("epsilon_decay", 0.995),
+                     epsilon_floor=data.get("epsilon_floor", 0.02))
         weights = data["weights"]
         if len(weights) != len(ACTIONS) or any(len(row) != WIDTH for row in weights):
             raise ValueError("invalid checkpoint matrix")
         policy.weights = [[float(w) for w in row] for row in weights]
         policy.updates, policy.episodes, policy.epsilon = data["updates"], data["episodes"], data["epsilon"]
+        def nested_tuple(value):
+            return tuple(nested_tuple(v) for v in value) if isinstance(value, list) else value
+        if "rng_state" in data:
+            policy.rng.setstate(nested_tuple(data["rng_state"]))
         return policy
 
 

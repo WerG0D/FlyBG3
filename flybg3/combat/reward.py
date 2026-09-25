@@ -15,6 +15,7 @@ class RewardConfig:
     victory: float = 3.0
     defeat: float = -3.0
     invalid_action: float = -0.05
+    timeout: float = -1.0
 
 
 class RewardEngine:
@@ -31,4 +32,5 @@ class RewardEngine:
             victory=c.victory if outcome.victory else 0.0,
             defeat=c.defeat if outcome.defeat else 0.0,
             invalid=c.invalid_action if outcome.status == "invalid" else 0.0,
+            timeout=c.timeout if outcome.timeout else 0.0,
         )

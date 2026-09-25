@@ -21,12 +21,14 @@ def _time() -> str:
 
 class EpisodeRunner:
     def __init__(self, simulation, policy: CombatLearner, reward: RewardEngine,
-                 *, control: str = "normal", sink: Callable[[dict], None] | None = None):
+                 *, control: str = "normal", sink: Callable[[dict], None] | None = None,
+                 before_decision: Callable[[int, int], str | None] | None = None):
         if control not in {"normal", "shuffled", "zero"}:
             raise ValueError("unknown neural control")
         self.simulation, self.policy, self.reward = simulation, policy, reward
         self.extractor = NeuralFeatureExtractor()
         self.control, self.sink = control, sink
+        self.before_decision = before_decision
 
     def _emit(self, event: str, episode_id: int, request_id: int, payload: dict) -> None:
         if self.sink is None:
@@ -43,7 +45,7 @@ class EpisodeRunner:
             feature_seed: int = 42) -> CombatEpisode:
         self.simulation.reset()
         session = str(uuid5(NAMESPACE_URL, f"flybg3-arena-{feature_seed}-{episode_id}"))
-        episode = CombatEpisode(episode_id, _time())
+        episode = CombatEpisode(episode_id, _time(), asdict(arena.state))
         shuffle_rng = random.Random(feature_seed + episode_id)
         request_id = 1
 
@@ -63,8 +65,10 @@ class EpisodeRunner:
             self._emit("neural_state", episode_id, request_id,
                        {"features_hz": features.to_dict(), "brain_ms": record["timings"]["simulation_ms"],
                         "feature_ms": feature_ms, "stimulus": record["stimulus"],
+                        "visualization_ms": record["timings"].get("visualization_ms", 0.0),
                         "neural_spikes": record["neural_activity"]["spikes"],
-                        "telemetry": record.get("telemetry")})
+                        "telemetry": record.get("telemetry"),
+                        "visualization": record.get("visualization")})
             self._emit("combat_state", episode_id, request_id,
                        {"npc_hp": observation["npc"]["hp"],
                         "enemy_hp": observation["nearest_hostile"]["hp"],
@@ -74,6 +78,12 @@ class EpisodeRunner:
 
         features, record = evaluate()
         while True:
+            if self.before_decision and self.before_decision(episode_id, request_id) == "reset_episode":
+                episode.end("aborted", _time())
+                self._emit("episode_end", episode_id, request_id,
+                           {"result": "aborted", "total_reward": episode.total_reward,
+                            "turns": episode.turn_count})
+                return episode
             t = perf_counter()
             proposed = self.policy.select_action(features, training=training)
             policy_ms = (perf_counter() - t) * 1000
