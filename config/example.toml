@@ -9,3 +9,13 @@ log_level = "DEBUG"
 [performance]
 device = "auto"
 decision_timeout_ms = 3000
+
+[telemetry]
+enabled = true # passive, independent of neural decision
+smoothing = 0.25 # visual EMA only
+
+[telemetry.scale]
+steering_max_hz = 10.0
+escape_max_hz = 50.0
+grooming_max_hz = 10.0
+dopamine_max_hz = 50.0

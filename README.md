@@ -71,6 +71,19 @@ Para um cenário interativo simples com o connectome real:
 python tools\fake_bg3.py --scenario left
 ```
 
+## Monitor neural em tempo real
+
+O bridge publica um snapshot compacto e atômico em `telemetry.json` após cada decisão. Em um **segundo** terminal, enquanto `python -m flybg3` roda no primeiro:
+
+```powershell
+python -m flybg3 telemetry
+python -m flybg3 telemetry --debug
+```
+
+`--debug` mostra DNs individuais e os dados de percepção (heading, ângulo, distância e velocidade). Para validar o monitor sem abrir BG3, rode `python tools\fake_bg3.py --scenario all`; os quatro cenários isolados mostram steering esquerdo/direito, looming e silêncio. Para o bridge de arquivos, use `--bridge-dir runtime\fake` no fake e `python -m flybg3 telemetry --directory runtime\fake` no monitor.
+
+A telemetria observa os spikes de steps já executados. O decoder não recebe nenhum valor do monitor. O teste com MaleCNS real confirmou que ligá-la não muda spikes, voltagens, scores nem ação. Consulte [NEURAL_TELEMETRY.md](docs/NEURAL_TELEMETRY.md) para grupos, fórmula, limites científicos e medição do overhead. Movimento físico não é ligado pelo monitor; para testar somente logs no BG3, use `!flybg3_physical off`.
+
 ## Bridge de arquivos sem BG3
 
 Terminal 1:

@@ -21,14 +21,31 @@ O nome agregado `DNg12` **não** existe como cell type exato: somente `DNg12_a`,
 
 ## Grandezas e apresentação
 
-Para cada grupo, `firing_rate_hz = spike_count / (neuron_count × window_seconds)`. A janela usa os mesmos últimos `decoder.decision_window` steps de `brain.simulate` (50 × 0,02 s = 1 s por padrão). A contagem individual inclui spikes de **toda** a simulação da decisão; `spikes` de cada barra refere-se à janela. `active_neurons` conta índices distintos que dispararam ao menos uma vez durante a decisão; `total_spikes` soma todos os disparos. Não são salvos 166.700 valores individuais.
+Para cada grupo, `firing_rate_hz = spike_count / (neuron_count × window_seconds)`. A janela usa os mesmos últimos `decoder.decision_window` steps de `brain.simulate` (50 × 0,02 s = 1 s por padrão). O campo `spikes` de cada grupo refere-se a essa janela. `active_neurons` conta índices distintos que dispararam ao menos uma vez durante **toda** a decisão; `total_spikes` soma todos os disparos. Não são salvos 166.700 valores individuais.
 
 O agregado ESCAPE e o agregado GROOMING são taxas normalizadas pelos respectivos tamanhos das populações unidas, e os valores de cada tipo permanecem em `individual_groups` para debug. Essa agregação não afirma que todos os componentes tenham o mesmo papel. Os valores em `telemetry.json` são **taxas brutas**. A suavização EMA e a escala das barras são aplicadas **somente no processo do dashboard**, após ler o arquivo; nenhum dos dois valores retorna ao bridge ou ao decoder. Os tetos em Hz são escolhas de escala visual, configuráveis, não limites biológicos. O monitor mostra a taxa bruta mesmo quando a barra visual satura.
 
 PAM/PPL1 são rótulos anatômicos de grupos dopaminérgicos; este LIF não modela adequadamente liberação de dopamina, plasticidade ou estados internos de reforço. `activity != pleasure`, `activity != happiness`, `activity != conscious reward`. As barras registram apenas atividade simulada no modelo atual. A inferência de comportamento biológico a partir da atividade desses grupos exige experimentos independentes.
 
+No teste local com a configuração padrão, PAM/PPL1 já apresentaram aproximadamente 42/29 Hz por neurônio em um cenário lateral fraco e PAM chegou a 50 Hz em looming. Isso é atividade basal/saturação **do modelo**, não uma descoberta de recompensa no jogo. O teto visual padrão dessas barras foi colocado em 50 Hz para evitar saturação artificial ainda maior; a taxa bruta permanece ao lado da barra.
+
 ## Reproduzir
 
 Em um terminal, mantenha `python -m flybg3 --config config/default.toml` executando. Em outro, rode `python -m flybg3 telemetry` ou `python -m flybg3 telemetry --debug`. O monitor lê `telemetry.json` no mesmo diretório do bridge e atualiza apenas quando `session_id`/`request_id` mudar. Para testes sem BG3, `python tools/fake_bg3.py --scenario all` exercita o mesmo MaleCNS, mas não cria uma nova request no bridge; use `--bridge-dir` para alimentar o bridge de arquivos.
 
-Para o teste no jogo, use `!flybg3_status` até `brain=ready` e depois `!flybg3_observe`, com movimento físico desligado (`!flybg3_physical off`). Compare o `request_id` e a decisão do console BG3 com o monitor. `heading_degrees`, `relative_angle`, distância e velocidade exibidos em `--debug` são apenas o conteúdo da observação real; se o campo não estiver disponível, aparece como ausente.
+Para o teste no jogo, use `!flybg3_status` até `brain=ready` e depois `!flybg3_observe`, com movimento físico desligado (`!flybg3_physical off`). Compare o `request_id` e a decisão do console BG3 com o monitor. `heading_degrees`, `relative_angle`, distância e velocidade exibidos em `--debug` são apenas o conteúdo da observação real; se o campo não estiver disponível, aparece como ausente. O BG3 não estava aberto durante a implementação desta feature; a comparação ao vivo permanece para o próximo teste no jogo.
+
+`telemetry.json` é escrito atomicamente no diretório do bridge. Ele contém `schema_version`, `recorded_at`, `session_id`, `request_id`, grupos, contagens, taxas, contexto, tempos e decisão. A mesma estrutura entra no JSONL da sessão. `action.json` não recebe esses grupos.
+
+### Resultado local reproduzido
+
+`python tools/fake_bg3.py --scenario all` reinicia o cérebro entre os quatro cenários isolados. Seed 42, CPU, 50 steps:
+
+| cenário | DNa02 L/R (Hz) | ESCAPE (Hz/neuron) | decisão | simulação | coleta de telemetria |
+| --- | ---: | ---: | --- | ---: | ---: |
+| left | 4,0 / 0,0 | 0,3 | TURN_LEFT | 200,6 ms | 2,57 ms |
+| right | 0,0 / 3,0 | 0,5 | TURN_RIGHT | 192,9 ms | 2,47 ms |
+| looming | 1,0 / 2,0 | 33,5 | RETREAT | 211,4 ms | 2,68 ms |
+| none | 0,0 / 0,0 | 0,3 | IDLE | 192,6 ms | 2,47 ms |
+
+A latência varia entre execuções; os números acima medem apenas esta máquina. Um round trip separado via arquivos mediu simulação 211,1 ms, coleta 2,90 ms e escrita atômica de `telemetry.json` 1,68 ms. A atualização Rich do dashboard medida nessa execução levou 0,17 ms. `simulation_ms` inclui a instrumentação; `decision_path_ms` desconta a coleta explicitamente medida para que o timeout não dependa desse custo visual. O teste `-m brain` confirmou spikes, taxas, estado de voltagem, scores e decisão idênticos com telemetria ligada/desligada, e o mesmo número de chamadas a `brain.step()`.
