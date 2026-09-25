@@ -56,7 +56,7 @@ def _format_optional(value: object, suffix: str = "", digits: int = 2) -> str:
 
 
 def render_snapshot(snapshot: dict, config: TelemetryConfig, state: DisplayState,
-                    *, debug: bool = False) -> Panel:
+                    *, debug: bool = False, speech: dict | None = None) -> Panel:
     table = Table.grid(padding=(0, 1))
     table.add_column(width=14)
     table.add_column(width=BAR_WIDTH)
@@ -100,6 +100,17 @@ def render_snapshot(snapshot: dict, config: TelemetryConfig, state: DisplayState
                            f"Closing speed: {_format_optional(environment.get('closing_speed'), ' m/s')}"),
                       Text(f"Telemetry compute: {_format_optional(snapshot.get('telemetry_compute_ms'), ' ms', 2)}")))
     lines.append(Text(f"DECISION: {snapshot['decision']}", style="bold green"))
+    if speech and (speech.get("session_id"), speech.get("request_id")) == (
+            snapshot["session_id"], snapshot["request_id"]):
+        intent = speech.get("intent", "silent")
+        lines.append(Text(f"INTENT: {str(intent).upper()}"))
+        if speech.get("text"):
+            lines.append(Text(f"SPEECH: {speech['text']}", style="bold magenta"))
+        confidence = speech.get("confidence")
+        urgency = speech.get("urgency")
+        if type(confidence) in (int, float) and type(urgency) in (int, float):
+            lines.append(Text(f"CONF: {confidence:.0%}  |  URGENCY: {urgency:.0%}  |  "
+                              f"AUDIO: {speech.get('status', 'unknown')}"))
     parts = [Text("MaleCNS v1.0", style="bold"), table]
     if debug and details is not None:
         parts.extend((Text("INDIVIDUAL", style="dim"), details))
@@ -113,16 +124,20 @@ def run_dashboard(directory: Path, config: TelemetryConfig, *, debug: bool = Fal
                   once: bool = False, poll_seconds: float = 0.2, console: Console | None = None) -> None:
     console = console or Console()
     state = DisplayState()
-    last_token: tuple[str, int] | None = None
+    last_token: tuple[str, int, str | None] | None = None
     console.print(Panel("Waiting for telemetry.json...", title="FlyBG3 Neural Monitor"))
     while True:
         snapshot = read_json(directory / "telemetry.json")
         if _valid(snapshot):
-            token = (snapshot["session_id"], snapshot["request_id"])
+            speech = read_json(directory / "speech.json")
+            matched_speech = speech if speech and (speech.get("session_id"), speech.get("request_id")) == (
+                snapshot["session_id"], snapshot["request_id"]) else None
+            token = (snapshot["session_id"], snapshot["request_id"],
+                     matched_speech.get("status") if matched_speech else None)
             if token != last_token:
                 if last_token is not None and token[0] != last_token[0]:
                     state = DisplayState()
-                console.print(render_snapshot(snapshot, config, state, debug=debug))
+                console.print(render_snapshot(snapshot, config, state, debug=debug, speech=matched_speech))
                 last_token = token
                 # A plain print remains visible in legacy Windows consoles where
                 # Rich Live cursor updates can erase the panel but leave debug logs.

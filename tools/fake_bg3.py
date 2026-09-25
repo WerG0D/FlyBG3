@@ -10,6 +10,8 @@ from flybg3.brain.simulation import Simulation
 from flybg3.bridge.atomic_io import atomic_write_json, read_json
 from flybg3.bridge.protocol import response_matches
 from flybg3.telemetry.dashboard import DisplayState, render_snapshot
+from flybg3.speech.decoder import SpeechDecoder
+from flybg3.speech.verbalizer import TemplateSpeechVerbalizer
 from rich.console import Console
 
 
@@ -39,6 +41,10 @@ def show(action: dict, record: dict | None = None, *, telemetry_config=None) -> 
         print(f"  {k:10} {'#' * min(30, round(v)):30} {v:.2f}")
     print("Scores:", action.get("debug", {}).get("scores", {}))
     print("ACTION:", action["action"].upper())
+    if record and record.get("speech"):
+        speech = record["speech"]
+        print("SPEECH INTENT:", speech["intent"].upper())
+        print("SPEECH TEXT:", speech.get("text") or "(silence)")
     print("Timing:", action.get("debug", {}).get("timings", {}))
 
 
@@ -93,9 +99,16 @@ def main() -> None:
                         record["telemetry"] = telemetry
                         break
                     time.sleep(0.02)
+            if c.speech.enabled:
+                speech = read_json(args.bridge_dir / "speech.json")
+                if speech and (speech.get("session_id"), speech.get("request_id")) == (session, rid):
+                    record["speech"] = speech
         else:
             result, record = sim.decide(observation)
             action = result.to_dict()
+            if c.speech.enabled:
+                state = SpeechDecoder(c.speech).decode(rid, record["neural_activity"]["rates_hz"])
+                record["speech"] = {**state.to_dict(), "text": TemplateSpeechVerbalizer().verbalize(state)}
         print(f"Scenario: {name} / request {rid}")
         show(action, record, telemetry_config=c.telemetry)
         with args.output.open("a", encoding="utf-8") as f:

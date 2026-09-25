@@ -9,19 +9,33 @@ from .bridge.atomic_io import atomic_write_json
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Frozen MaleCNS -> BG3 filesystem bridge")
-    parser.add_argument("command", nargs="?", choices=["telemetry"], help="Read-only terminal neural monitor")
+    parser.add_argument("command", nargs="?", choices=["telemetry", "speech-test"],
+                        help="Read-only monitor or standalone Windows voice check")
     parser.add_argument("--config")
     parser.add_argument("--directory")
     parser.add_argument("--once", action="store_true")
     parser.add_argument("--reset", action="store_true", help="Request manual reset in running bridge")
     parser.add_argument("--debug", action="store_true")
+    parser.add_argument("--speech", action="store_true", help="Enable optional neural speech for this bridge run")
     args = parser.parse_args()
     config = load_config(args.config)
     if args.directory:
         config.bridge.directory = args.directory
+    if args.speech:
+        config.speech.enabled = True
     logging.basicConfig(level="DEBUG" if args.debug else config.bridge.log_level,
                         format="[FlyBG3] %(levelname)s: %(message)s")
     print(f"FlyBG3 {__version__}", flush=True)
+    if args.command == "speech-test":
+        from .speech.tts import NullTTSProvider, make_provider
+        provider = make_provider(config.speech)
+        if isinstance(provider, NullTTSProvider):
+            print("Speech audio unavailable (NullTTSProvider); choose a Windows voice provider", flush=True)
+            return
+        for phrase in ("Left.", "Right.", "Danger.", "Away."):
+            print(f"Speaking: {phrase}", flush=True)
+            provider.speak(phrase)
+        return
     if args.command == "telemetry":
         from .telemetry.dashboard import run_dashboard
         try:

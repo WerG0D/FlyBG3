@@ -10,6 +10,7 @@ import time
 from uuid import uuid4
 from flybg3.config import Config
 from flybg3.brain.simulation import Simulation
+from flybg3.speech.runtime import SpeechRuntime
 from .atomic_io import atomic_write_json, read_json
 from .protocol import Action, ActionType, ProtocolError, uuid_string
 from .watcher import RequestJournal, observation_at, single_instance
@@ -18,7 +19,7 @@ LOG = logging.getLogger("FlyBG3")
 
 
 class BridgeService:
-    def __init__(self, config: Config, simulation=None):
+    def __init__(self, config: Config, simulation=None, speech=None):
         self.config = config
         self.directory = config.directory()
         self.directory.mkdir(parents=True, exist_ok=True)
@@ -29,6 +30,15 @@ class BridgeService:
         self.failure: str | None = None
         self.log_path = Path(config.bridge.log_directory) / f"session-{datetime.now():%Y%m%d-%H%M%S}-{str(uuid4())[:8]}.jsonl"
         self.log_path.parent.mkdir(parents=True, exist_ok=True)
+        self.log_lock = threading.Lock()
+        self.speech = speech if speech is not None else (
+            SpeechRuntime(config.speech, self.directory, self._append_event) if config.speech.enabled else None)
+
+    def _append_event(self, event: dict) -> None:
+        with self.log_lock:
+            with self.log_path.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(event, allow_nan=False) + "\n")
+                f.flush()
 
     def heartbeat(self, alive: bool = True) -> None:
         atomic_write_json(self.directory / "heartbeat_brain.json", {
@@ -69,6 +79,8 @@ class BridgeService:
                 # New save/peer = a new experiment. Within session never reset.
                 if self.session is not None:
                     self.simulation.reset()
+                    if self.speech:
+                        self.speech.reset()
                 self.session = observation["session_id"]
             action, record = self.simulation.decide(observation)
             if record["timings"].get("decision_path_ms", record["timings"]["total_ms"]) > self.config.performance.decision_timeout_ms:
@@ -88,10 +100,17 @@ class BridgeService:
             record["telemetry"]["decision"] = action.action.upper()
         record["recorded_at"] = datetime.now(timezone.utc).isoformat()
         # Audit before publication. A logging failure stops this request safely.
-        with self.log_path.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(record, allow_nan=False) + "\n")
-            f.flush()
+        self._append_event(record)
         atomic_write_json(self.directory / "action.json", action.to_dict())
+        # Strict side channel: the motor action is already decided, audited and
+        # published before any speech code sees the neural rates.
+        if self.speech and not action.debug.get("error"):
+            rates = record.get("neural_activity", {}).get("rates_hz")
+            if rates:
+                try:
+                    self.speech.handle(observation["session_id"], observation["request_id"], rates)
+                except Exception:
+                    LOG.exception("Neural speech failed; action already published")
         if "telemetry" in record:
             try:
                 started = time.perf_counter()
@@ -126,6 +145,8 @@ class BridgeService:
                             if journal.claim("reset:" + token, 1):
                                 if self.simulation:
                                     self.simulation.reset()
+                                    if self.speech:
+                                        self.speech.reset()
                                 else:
                                     self.load()
                                 LOG.info("Manual neural reset %s", token)
@@ -149,3 +170,5 @@ class BridgeService:
                 worker.join(timeout=2)
                 self.heartbeat(alive=False)
                 journal.close()
+                if self.speech:
+                    self.speech.close()
