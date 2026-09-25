@@ -2,6 +2,22 @@
 
 NPC de Baldur's Gate 3 controlado por uma simulação neural spiking cuja conectividade deriva do connectome MaleCNS v1.0 de *Drosophila melanogaster*.
 
+## Combat Learning Lab (experimental)
+
+Foi acrescentado um laboratório **sintético** de combate 1v1 que reutiliza o MaleCNS real e treina somente um readout linear de suas taxas descendentes. O cérebro e seus pesos permanecem congelados. A arena executa a ação escolhida, mede dano/resultado, calcula recompensa e atualiza a política após obter a janela neural seguinte. O painel web é um observador separado. **Esta versão do laboratório ainda não ataca no BG3 real**, não instala um adaptador de combate e não altera o TTS/movimento já validado no jogo.
+
+```text
+Terminal 1: python -m flybg3 dashboard --config config/combat-lab.toml
+Terminal 2: python -m flybg3 arena --config config/combat-lab.toml --mode train --policy trainable --episodes 10
+Browser:    http://127.0.0.1:8765
+```
+
+Antes do primeiro uso do painel, construa o frontend com `.\scripts\dashboard_build.ps1` (Node.js/npm). Em `EVAL`, `--mode eval --policy frozen` executa a arena sem explorar nem atualizar pesos. Uma comparação reproduzível usa `python -m flybg3 validate-learning --config config/combat-lab.toml --train-episodes 3 --eval-episodes 3 --seeds 42 43 44` e grava [learning_validation.json](experiments/learning_validation.json). Os arquivos completos por run ficam em `runtime/lab-runs/`; `dashboard/public/connectome.json` contém uma amostra real das coordenadas e conexões do MaleCNS. Refaça-a com `python -m flybg3 export-connectome` se trocar o dataset.
+
+Leia [COMBAT_LEARNING.md](docs/COMBAT_LEARNING.md), [LEARNING_RESEARCH.md](docs/LEARNING_RESEARCH.md), [REWARD_DESIGN.md](docs/REWARD_DESIGN.md) e [DASHBOARD.md](docs/DASHBOARD.md) para fórmulas, limites e controles. Uma melhoria no simulador **não** é evidência automática de aprendizado em BG3.
+
+**Estado do treino:** a avaliação inicial em A venceu, mas a política apenas repetiu `BASIC_ATTACK`; após continuação e currículo, as avaliações em C e D não venceram. Consulte [LEARNING_VALIDATION.md](docs/LEARNING_VALIDATION.md) e o resumo [continuation.json](experiments/continuation.json). O resultado é inconclusivo para aprendizado neural generalizável. Para continuar pesos de um checkpoint, use `python -m flybg3 arena --mode train --policy trainable --opponent D --episodes 40 --eval-episodes 8 --checkpoint CAMINHO_DO_CHECKPOINT`; `--exploration 0.7` aumenta apenas a busca durante o treino e fica registrado no manifest.
+
 O marco atual executa **movimento físico derivado da atividade neural**:
 
 ```text

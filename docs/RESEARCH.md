@@ -1,5 +1,9 @@
 # Pesquisa de APIs — 2026-09-21
 
+## Extensão de aprendizado de combate (2026-09-25)
+
+A auditoria específica de plasticidade, estados persistentes e posições anatômicas está em [LEARNING_RESEARCH.md](LEARNING_RESEARCH.md). `flybrain==0.1.0` não implementa atualização de pesos, STDP ou recompensa neural; o laboratório aprende somente um readout linear externo. `brain.npz` contém soma positions e IDs reais, utilizados pela amostra visual. A escolha `BASIC_ATTACK` na arena é uma categoria de política treinável, **não** uma associação biológica comprovada de qualquer DN a ataque.
+
 ## TTS local para verbalização neural (2026-09-24)
 
 O provider opcional usa [`System.Speech.Synthesis.SpeechSynthesizer.Speak`](https://learn.microsoft.com/en-us/dotnet/api/system.speech.synthesis.speechsynthesizer.speak?view=netframework-4.8.1) da Microsoft em Windows PowerShell 5.1. A API é síncrona; por isso só é chamada no worker de áudio, nunca no loop BG3/Python. A documentação da classe confirma `Rate` (-10..10), `Volume` (0..100), saída para dispositivo padrão e o método `Speak`. Nesta máquina, `Add-Type -AssemblyName System.Speech` encontrou Microsoft Maria Desktop e Microsoft Zira Desktop; `python -m flybg3 speech-test` executou as quatro frases locais sem erro. O texto é codificado em Base64 antes de entrar no script PowerShell; não é interpretado como código. Não foi adicionada dependência Python de TTS nem serviço de rede.
