@@ -14,7 +14,7 @@ from flybg3.bridge.service import BridgeService
 from flybg3.bridge.watcher import RequestJournal
 from flybg3.config import Config, TelemetryConfig, load_config
 from flybg3.telemetry.collector import TelemetryCollector
-from flybg3.telemetry.dashboard import DisplayState, normalized_display_rate, render_snapshot
+from flybg3.telemetry.dashboard import DisplayState, normalized_display_rate, render_snapshot, run_dashboard
 from flybg3.telemetry.registry import ResolvedGroup, TelemetryGroup, resolve_telemetry_groups
 
 
@@ -81,6 +81,19 @@ def test_dashboard_renders_neural_and_perception_context():
     for expected in ("STEER LEFT", "STEER RIGHT", "ESCAPE", "DNp01", "12,428", "18,329",
                      "2.72 m", "118.40 deg", "-84.73 deg", "TURN_RIGHT"):
         assert expected in rendered
+
+
+def test_dashboard_prints_complete_panel_in_noninteractive_console(tmp_path):
+    snapshot = {"schema_version": 1, "session_id": str(uuid4()), "request_id": 7,
+                "groups": {"steer_left": {"hz": 2.0}},
+                "individual_groups": {}, "decision": "TURN_LEFT"}
+    (tmp_path / "telemetry.json").write_text(json.dumps(snapshot), encoding="utf-8")
+    console = Console(record=True, width=100, force_terminal=False)
+    run_dashboard(tmp_path, TelemetryConfig(), once=True, console=console)
+    rendered = console.export_text()
+    assert "STEER LEFT" in rendered
+    assert "DECISION: TURN_LEFT" in rendered
+    assert "request #7" in rendered
 
 
 def test_config_nested_telemetry_scale(tmp_path):

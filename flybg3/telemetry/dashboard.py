@@ -7,7 +7,6 @@ from pathlib import Path
 import time
 
 from rich.console import Console, Group
-from rich.live import Live
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
@@ -115,21 +114,18 @@ def run_dashboard(directory: Path, config: TelemetryConfig, *, debug: bool = Fal
     console = console or Console()
     state = DisplayState()
     last_token: tuple[str, int] | None = None
-    with Live(Panel("Waiting for telemetry.json...", title="FlyBG3 Neural Monitor"),
-              console=console, auto_refresh=False, transient=False) as live:
-        while True:
-            snapshot = read_json(directory / "telemetry.json")
-            if _valid(snapshot):
-                token = (snapshot["session_id"], snapshot["request_id"])
-                if token != last_token:
-                    if last_token is not None and token[0] != last_token[0]:
-                        state = DisplayState()
-                    started = time.perf_counter()
-                    live.update(render_snapshot(snapshot, config, state, debug=debug), refresh=True)
-                    last_token = token
-                    # Render time is measured here, not fed back into neural processing.
-                    if debug:
-                        console.log(f"Dashboard update: {(time.perf_counter() - started) * 1000:.2f} ms")
-                    if once:
-                        return
-            time.sleep(poll_seconds)
+    console.print(Panel("Waiting for telemetry.json...", title="FlyBG3 Neural Monitor"))
+    while True:
+        snapshot = read_json(directory / "telemetry.json")
+        if _valid(snapshot):
+            token = (snapshot["session_id"], snapshot["request_id"])
+            if token != last_token:
+                if last_token is not None and token[0] != last_token[0]:
+                    state = DisplayState()
+                console.print(render_snapshot(snapshot, config, state, debug=debug))
+                last_token = token
+                # A plain print remains visible in legacy Windows consoles where
+                # Rich Live cursor updates can erase the panel but leave debug logs.
+                if once:
+                    return
+        time.sleep(poll_seconds)
