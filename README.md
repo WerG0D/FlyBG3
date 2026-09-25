@@ -84,6 +84,18 @@ python -m flybg3 telemetry --debug
 
 A telemetria observa os spikes de steps já executados. O decoder não recebe nenhum valor do monitor. O teste com MaleCNS real confirmou que ligá-la não muda spikes, voltagens, scores nem ação. Consulte [NEURAL_TELEMETRY.md](docs/NEURAL_TELEMETRY.md) para grupos, fórmula, limites científicos e medição do overhead. Movimento físico não é ligado pelo monitor; para testar somente logs no BG3, use `!flybg3_physical off`.
 
+## Fala neural opcional
+
+O `SpeechDecoder` lê somente as taxas neurais descendentes já calculadas e produz frases curtas por templates, em paralelo à ação motora. O TTS local do Windows roda em uma fila assíncrona; falhas de voz não alteram o cérebro nem `action.json`. A fala vem **desativada** por padrão.
+
+```powershell
+python -m flybg3 speech-test  # testa a voz local, sem carregar MaleCNS
+python -m flybg3 --config config\default.toml --speech
+python -m flybg3 telemetry --debug  # em outro terminal; mostra intenção e texto
+```
+
+Mantenha **um único bridge**: encerre uma instância anterior antes de iniciar com `--speech`. Para testar sem som, use `provider = "null"` em uma cópia local do TOML. O bridge grava `speech.json` junto de `action.json`; o JSONL da sessão registra enqueue e conclusão. `!flybg3_physical off` é opcional para testar voz sem deslocamento e não é exigido pelo TTS. O mapeamento, limiares, fórmulas, resultados e limites científicos estão em [NEURAL_SPEECH.md](docs/NEURAL_SPEECH.md).
+
 ## Bridge de arquivos sem BG3
 
 Terminal 1:
@@ -143,6 +155,8 @@ Arquivos de comunicação no Windows:
 %LOCALAPPDATA%\Larian Studios\Baldur's Gate 3\Script Extender\FlyBG3\
   observation.json
   action.json
+  telemetry.json
+  speech.json # somente quando a fala opcional está ativa
   heartbeat_bg3.json
   heartbeat_brain.json
   requests.sqlite3
