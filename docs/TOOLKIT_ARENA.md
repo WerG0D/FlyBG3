@@ -43,7 +43,31 @@ No PowerShell, na raiz do repositório:
 .\scripts\install_mod.ps1 -PackageName FlyBG3Arena
 ```
 
-O PAK foi compilado e listado com `Divine.exe`; contém um personagem e quatro itens de `Basic_Level_A`. Foi copiado para `%LOCALAPPDATA%\Larian Studios\Baldur's Gate 3\Mods\FlyBG3Arena.pak`. Ative `FlyBG3Arena` e `FlyBG3` no gerenciador de mods antes de usar ambos no jogo. Se o gerenciador mostrar duas entradas para `FlyBG3Arena` (projeto solto em `Data` e PAK), ative **uma** delas; o PAK versionado é o artefato para o jogo, e os arquivos soltos servem à edição no Toolkit. O jogo normal ainda não foi aberto para verificar esta combinação.
+O PAK foi compilado e listado com `Divine.exe`; contém um personagem e quatro itens de `Basic_Level_A`. Foi copiado para `%LOCALAPPDATA%\Larian Studios\Baldur's Gate 3\Mods\FlyBG3Arena.pak`. Ative `FlyBG3Arena` e `FlyBG3` no gerenciador de mods antes de usar ambos no jogo. Se o gerenciador mostrar duas entradas para `FlyBG3Arena` (projeto solto em `Data` e PAK), ative **uma** delas; o PAK versionado é o artefato para o jogo, e os arquivos soltos servem à edição no Toolkit. O usuário confirmou que a arena, os objetos, o Flyman e o combate abriram no jogo normal.
+
+## Teste neural no jogo normal
+
+Inicie o bridge em um terminal PowerShell separado e mantenha esse processo aberto enquanto joga:
+
+```powershell
+cd 'C:\Users\Wer\Documents\ChatGPT\FlyBG3'
+.\scripts\run_bridge.ps1
+```
+
+Aguarde `166700 neurons loaded` e `Waiting for observation...`. No console **server** do Script Extender, use:
+
+```text
+Osi.TeleportPartiesToLevelWithMovie("Basic_Level_A", "FlyBG3Arena_Arrive", "")
+!flybg3_spawn
+!flybg3_status
+!flybg3_physical on
+!flybg3_combat_move on
+!flybg3_observe
+```
+
+O prefixo `!` é necessário para os comandos registrados pelo mod; sem ele, o console tenta interpretar `flybg3_combat_move on` como Lua e produz erro de sintaxe. O resultado de `!flybg3_status` deve conter `brain=ready` e `heartbeat_age_ms` abaixo de 5000. Se aparecer `brain=offline`, confira se o terminal do bridge continua em execução e se terminou de carregar o MaleCNS. Depois, envie **uma nova** observação: `!flybg3_observe`. O jogo ignora respostas antigas, portanto observações feitas antes de iniciar o bridge não serão repetidas.
+
+O primeiro teste no jogo mostrou `Observation #N sent` e a seleção de um hostil visível no turno do Flyman. As decisões desse teste deram `Brain bridge offline/stale; IDLE`, pois não havia processo Python ativo e o último `heartbeat_brain.json` tinha parado de atualizar. O bridge foi iniciado posteriormente e carregou o MaleCNS; ainda falta confirmar no console do jogo uma decisão nova com ele ativo.
 
 Para atualizar o repositório depois de editar a arena no Toolkit, copie os novos arquivos de `Data\Mods\FlyBG3Arena_00a41563-37f2-988d-98c9-5ca9bb65423a` para a pasta de mesmo nome em `bg3-mod/FlyBG3Arena/Mods/`, revise o diff e execute novamente `build_arena.ps1`. Não copie arquivos do projeto `FlyBG3` sobre esta pasta.
 
@@ -51,4 +75,4 @@ Para atualizar o repositório depois de editar a arena no Toolkit, copie os novo
 
 **LIMITAÇÃO:** esta instalação do Toolkit está em `USER MODE`; o Level Browser não oferece `Create` para um nível novo. A [atualização oficial de Patch 8](https://baldursgate3.game/news/the-final-patch-new-subclasses-photo-mode-and-cross-play_138) permite adicionar ou substituir itens, personagens e triggers em níveis existentes, mas não criar prédios, cenário estático nem terreno novo. **CAUSA:** restrições da edição parcial de níveis do Toolkit oficial. **EVIDÊNCIA:** a interface observada só mostrou níveis herdados; a Larian descreve expressamente esses limites. **ALTERNATIVA:** o campo `Basic_Level_A` acima permite testes imediatos. Para uma sala fechada original, será necessária uma versão desbloqueada como [MoonGlasses](https://www.nexusmods.com/baldursgate3/mods/12308) e um fluxo de nível novo; o [guia comunitário de criação de nível](https://wiki.bg3.community/Tutorials/Toolkit/Creating-a-new-level) descreve o template `Basic_Level_A` como ponto de partida. A instalação e compatibilidade do MoonGlasses com este build do Toolkit não foram validadas aqui.
 
-Uma entrada controlada no jogo normal exige teste adicional. A API oficial [TeleportPartiesToLevelWithMovie](https://docs.baldursgate3.game/index.php?title=TeleportPartiesToLevelWithMovie) aceita nome do nível, evento e filme, mas nenhuma chamada automática foi adicionada ao mod porque ainda não validamos o efeito de teleportar um save para `Basic_Level_A`. Teste primeiro em save descartável.
+A API oficial [TeleportPartiesToLevelWithMovie](https://docs.baldursgate3.game/index.php?title=TeleportPartiesToLevelWithMovie) aceita nome do nível, evento e filme. A chamada manual acima abriu `Basic_Level_A` no jogo normal. Use um save descartável para repetir o teste; nenhuma viagem automática foi adicionada ao mod.
