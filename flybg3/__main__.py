@@ -31,7 +31,7 @@ def main() -> None:
         provider = make_provider(config.speech)
         if isinstance(provider, NullTTSProvider):
             print("Speech audio unavailable (NullTTSProvider); choose a Windows voice provider", flush=True)
-            return
+            raise SystemExit(1)
         for phrase in ("Left.", "Right.", "Danger.", "Away."):
             print(f"Speaking: {phrase}", flush=True)
             provider.speak(phrase)

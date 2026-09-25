@@ -5,6 +5,7 @@ from collections import deque
 from dataclasses import dataclass
 import logging
 import threading
+import time
 from typing import Callable
 
 from .tts import NullTTSProvider, TTSProvider
@@ -31,6 +32,7 @@ class SpeechQueue:
         self.pending: deque[SpeechEvent] = deque()
         self.condition = threading.Condition()
         self.stopped = False
+        self.busy = False
         self.thread = threading.Thread(target=self._work, name="FlyBG3Speech", daemon=True)
         self.thread.start()
 
@@ -62,6 +64,7 @@ class SpeechQueue:
                 if self.stopped:
                     return
                 event = self.pending.popleft()
+                self.busy = True
             played, error = False, None
             try:
                 self.provider.speak(event.text)
@@ -74,6 +77,20 @@ class SpeechQueue:
                     self.on_complete(event, played, error)
                 except Exception:
                     LOG.exception("Neural speech completion callback failed")
+            with self.condition:
+                self.busy = False
+                self.condition.notify_all()
+
+    def wait_idle(self, timeout: float) -> bool:
+        """Only for one-shot test mode; the continuous bridge never waits for audio."""
+        deadline = time.monotonic() + timeout
+        with self.condition:
+            while (self.pending or self.busy) and not self.stopped:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    return False
+                self.condition.wait(remaining)
+            return not self.pending and not self.busy
 
     def close(self) -> None:
         with self.condition:

@@ -65,6 +65,7 @@ def test_queue_coalesces_direction_and_never_blocks_enqueue():
         assert [event.request_id for event in queue.pending] == [3]
         release.set()
         _wait_for(lambda: heard == ["Danger.", "Danger. Right."])
+        assert queue.wait_idle(timeout=1)
     finally:
         release.set()
         queue.close()

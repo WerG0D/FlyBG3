@@ -158,6 +158,8 @@ class BridgeService:
                                      and type(hb.get("unix_ms")) in (int, float)
                                      and 0 <= time.time() * 1000 - hb["unix_ms"] <= 10000)
                             if fresh and self.process(observation, journal) and once:
+                                if self.speech:
+                                    self.speech.queue.wait_idle(timeout=15)
                                 break
                         last_error = ""
                     except (ProtocolError, OSError, ValueError) as e:
