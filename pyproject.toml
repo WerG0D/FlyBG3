@@ -7,7 +7,7 @@ name = "flybg3"
 version = "0.1.0"
 description = "BG3 NPC driven by a frozen MaleCNS spiking connectome"
 requires-python = ">=3.11"
-dependencies = ["flybrain==0.1.0"]
+dependencies = ["flybrain==0.1.0", "rich>=14,<15"]
 
 [project.optional-dependencies]
 test = ["pytest>=8", "jsonschema>=4", "lupa>=2.2"]
