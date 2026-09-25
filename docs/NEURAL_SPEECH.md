@@ -61,7 +61,11 @@ Alternativamente copie `config/example.toml` para uma configuração local, ajus
 
 Para teste sem jogo, `python tools\fake_bg3.py --config config\example.toml --scenario all` produz LEFT, RIGHT, DANGER e SILENT com o cérebro real sem reproduzir áudio. Para testar arquivos e voz juntos, mantenha o bridge acima rodando com `--directory runtime\speech-demo` e execute `python tools\fake_bg3.py --bridge-dir runtime\speech-demo --scenario left`; então consulte `runtime\speech-demo\speech.json`. O modo contínuo permite que o worker conclua o áudio. `--once` aguarda somente no encerramento desse teste até 15 s pelo áudio pendente; isso não afeta o bridge contínuo.
 
-No BG3, com o bridge de voz já iniciado, use no console server-side `!flybg3_physical off` para um teste sem deslocamento, `!flybg3_status` e `!flybg3_observe`. A console BG3 deve continuar mostrando `Observation #N sent` e `Neural decision #N`. O Python registra `Speech intent: ...; text='...'`. Essa feature não altera o PAK ou os comandos Lua; não habilita movimento físico. A verificação ao vivo dentro de um save com este novo código ainda depende de abrir BG3 e executar a observação manual.
+No BG3, com o bridge de voz já iniciado, use no console server-side `!flybg3_physical off` para um teste sem deslocamento, `!flybg3_status` e `!flybg3_observe`. A console BG3 continua mostrando `Observation #N sent` e `Neural decision #N`. O Python registra `Speech intent: ...; text='...'`. Essa feature não altera o PAK ou os comandos Lua; não habilita movimento físico.
+
+### Validação no save real — 24/09/2026
+
+O bridge e o dashboard com `--speech` foram executados enquanto `bg3_dx11.exe` estava ativo. A observação #1, sem hostil visível, produziu ação `IDLE`, intenção `SILENT` e nenhum áudio. A observação #2 (mesma sessão `0c043ba8…`, hostil visível a 1,64 m) produziu `DNa02_L=0 Hz`, `DNa02_R=3 Hz`, ação `TURN_RIGHT`, intenção `RIGHT` e texto “Right.”. `observation.json`, `action.json`, `telemetry.json` e `speech.json` apresentaram o mesmo `session_id` e `request_id=2`; o status da fala passou de `queued` para `spoken`, e ambos os eventos constam no JSONL da sessão. O painel exibiu decisão, intenção, frase e `AUDIO: spoken`. `spoken` significa que o provider Windows concluiu `Speak()` sem erro; a percepção acústica do usuário não é mensurável pelo bridge. A simulação levou 312 ms; decode de fala 0,022 ms, verbalização 0,002 ms e enqueue 0,028 ms. Ainda falta observar uma intenção `DANGER` em combate real sob estímulo forte de escape.
 
 ## Limites científicos
 
