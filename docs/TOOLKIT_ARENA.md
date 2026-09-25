@@ -1,6 +1,6 @@
 # FlyBG3Arena: campo de testes no BG3 Toolkit
 
-O projeto **FlyBG3Arena** foi criado no BG3 Toolkit 4.1.1.6931813. Ele acrescenta quatro caixas e um `Goblin Brawler` ao nível herdado `Basic_Level_A`, ao redor do ponto inicial. É um cenário separado do mod neural FlyBG3: nenhuma regra do encoder, connectome ou decoder foi alterada.
+O projeto **FlyBG3Arena** foi criado no BG3 Toolkit 4.1.1.6931813. Ele acrescenta quatro caixas e, após a edição de 24/09/2026, quatro personagens ao nível herdado `Basic_Level_A`: um `Goblin Brawler`, um `BASE_Mephit` e dois `Dragon_Red`. É um cenário separado do mod neural FlyBG3: nenhuma regra do encoder, connectome ou decoder foi alterada.
 
 ```text
                 marcador C
@@ -27,23 +27,31 @@ Essas posições vieram dos `.lsf` salvos pelo editor e convertidos para inspeç
 1. Abra **Baldur's Gate 3 Toolkit**.
 2. Selecione o projeto `FlyBG3Arena`.
 3. No Level Browser, escolha `Basic_Level_A`.
-4. Pressione `Ctrl+Enter` para entrar em Game Mode. O avatar de teste, quatro caixas e o goblin devem aparecer. Pressione `Ctrl+Enter` novamente para voltar ao editor.
+4. Pressione `Ctrl+Enter` para entrar em Game Mode. O avatar de teste, quatro caixas e os personagens da arena devem aparecer. Pressione `Ctrl+Enter` novamente para voltar ao editor.
 5. Salve alterações adicionais com **File → Save all** (`Ctrl+Alt+S`). O Toolkit escreve objetos em `Data\Mods\FlyBG3Arena_00a41563-37f2-988d-98c9-5ca9bb65423a\Levels\Basic_Level_A`.
 
-O teste de Game Mode foi executado nesta máquina: o terreno, as quatro caixas, o goblin e a interface do avatar carregaram. Isso verifica os objetos no editor; **não comprova** que o goblin seja hostil ao Flyman nem que o Script Extender funcione dentro do processo do Toolkit. Para decisões neurais, mantenha o fluxo BG3 + Script Extender + bridge Python já descrito no README.
+O teste inicial de Game Mode foi executado nesta máquina: o terreno, as quatro caixas, o goblin e a interface do avatar carregaram. As três criaturas adicionadas depois aparecem no editor; a nova versão empacotada ainda requer verificação em jogo. O teste do editor **não comprova** que os personagens sejam hostis ao Flyman nem que o Script Extender funcione dentro do processo do Toolkit. Para decisões neurais, mantenha o fluxo BG3 + Script Extender + bridge Python já descrito no README.
 
 ## Arquivos e instalação no jogo normal
 
 Os arquivos gerados pelo Toolkit foram copiados para `bg3-mod/FlyBG3Arena/Mods/`. O arquivo `toolkit/FlyBG3Arena/Projects/.../meta.lsx` preserva a identidade do projeto para recuperação em outra instalação. O UUID do módulo `00a41563-37f2-988d-98c9-5ca9bb65423a` foi emitido pelo Toolkit; não é um UUID de NPC nem do save. A arena e o FlyBG3 têm módulos distintos para impedir que uma publicação do editor substitua os scripts do mod neural.
 
-No PowerShell, na raiz do repositório:
+Após editar, use **File → Save all** no Toolkit, feche o Toolkit e o BG3 e, no PowerShell na raiz do repositório, execute:
+
+```powershell
+.\scripts\update_arena.ps1 -DivineExe 'C:\Users\Wer\Downloads\Packed\Tools\Divine.exe'
+```
+
+O script sincroniza os arquivos salvos em `Data\Mods\FlyBG3Arena_...` com a fonte versionada, constrói o PAK, instala com `-Force` e confere SHA-256. Ele interrompe a atualização se encontrar arquivos que existem apenas na fonte versionada, para que uma remoção feita no editor seja revisada antes de apagar dados. Se o PAK instalado estiver aberto em outro processo, feche o Toolkit e o jogo e tente novamente. Para apenas sincronizar e empacotar, sem instalar, use `-BuildOnly`.
+
+Também é possível executar as etapas de empacotamento e instalação separadamente, após sincronizar os arquivos do Toolkit:
 
 ```powershell
 .\scripts\build_arena.ps1 -DivineExe 'C:\Users\Wer\Downloads\Packed\Tools\Divine.exe'
-.\scripts\install_mod.ps1 -PackageName FlyBG3Arena
+.\scripts\install_mod.ps1 -PackageName FlyBG3Arena -Force
 ```
 
-O PAK foi compilado e listado com `Divine.exe`; contém um personagem e quatro itens de `Basic_Level_A`. Foi copiado para `%LOCALAPPDATA%\Larian Studios\Baldur's Gate 3\Mods\FlyBG3Arena.pak`. Ative `FlyBG3Arena` e `FlyBG3` no gerenciador de mods antes de usar ambos no jogo. Se o gerenciador mostrar duas entradas para `FlyBG3Arena` (projeto solto em `Data` e PAK), ative **uma** delas; o PAK versionado é o artefato para o jogo, e os arquivos soltos servem à edição no Toolkit. O usuário confirmou que a arena, os objetos, o Flyman e o combate abriram no jogo normal.
+O PAK atualizado foi compilado e listado com `Divine.exe`; contém quatro personagens e quatro itens de `Basic_Level_A` (10 entradas no total). Foi copiado para `%LOCALAPPDATA%\Larian Studios\Baldur's Gate 3\Mods\FlyBG3Arena.pak`, e o hash do arquivo instalado foi comparado ao gerado. Ative `FlyBG3Arena` e `FlyBG3` no gerenciador de mods antes de usar ambos no jogo. Se o gerenciador mostrar duas entradas para `FlyBG3Arena` (projeto solto em `Data` e PAK), ative **uma** delas; o PAK versionado é o artefato para o jogo, e os arquivos soltos servem à edição no Toolkit. Depois de atualizar, reinicie o BG3 e teste a arena a partir de um save anterior à visita ao nível. O usuário confirmou que a versão anterior da arena, os objetos, o Flyman e o combate abriram no jogo normal; a nova composição ainda precisa ser testada dentro do BG3.
 
 ## Teste neural no jogo normal
 
