@@ -46,3 +46,18 @@ steering_max_hz = 10.0 # bar saturation; raw Hz remains visible
 escape_max_hz = 50.0
 grooming_max_hz = 10.0
 dopamine_max_hz = 50.0 # model PAM/PPL1 can have high tonic firing
+
+[speech]
+enabled = false # opt-in; never changes neural simulation or motor action
+provider = "windows" # local System.Speech; "null" for silent tests
+cooldown_seconds = 2.0
+min_confidence = 0.35
+min_activity_hz = 1.0
+escape_threshold_hz = 3.0
+urgency_scale_hz = 20.0
+queue_size = 2
+speak_idle = false
+
+[speech.voice]
+rate = 0 # Windows System.Speech: -10..10
+volume = 100 # 0..100

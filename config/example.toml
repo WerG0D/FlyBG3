@@ -19,3 +19,18 @@ steering_max_hz = 10.0
 escape_max_hz = 50.0
 grooming_max_hz = 10.0
 dopamine_max_hz = 50.0
+
+[speech]
+enabled = true # optional local TTS; default.toml keeps it off
+provider = "windows" # or "null" for testing without sound
+cooldown_seconds = 2.0
+min_confidence = 0.35
+min_activity_hz = 1.0
+escape_threshold_hz = 3.0
+urgency_scale_hz = 20.0
+queue_size = 2
+speak_idle = false
+
+[speech.voice]
+rate = 0
+volume = 100
