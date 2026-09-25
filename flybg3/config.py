@@ -24,6 +24,8 @@ class EncoderConfig:
     left_right_gain: float = 1.0
     damage_gain: float = 0.8
     tracking_gain: float = 0.6
+    proximity_gain: float = 0.0 # opt-in experimental size/near-field proxy
+    health_stress_gain: float = 0.0 # opt-in bilateral visceral-threat proxy
     cap: float = 0.8
     minimum_sample_seconds: float = 0.05
     maximum_sample_seconds: float = 10.0
@@ -140,7 +142,7 @@ class Config:
             raise ValueError("device must be cpu, cuda or auto")
         if not 0 <= self.decoder.smoothing < 1:
             raise ValueError("smoothing must be in [0,1)")
-        if any(getattr(self.encoder, k) < 0 for k in ("looming_gain", "left_right_gain", "damage_gain", "tracking_gain", "cap")):
+        if any(getattr(self.encoder, k) < 0 for k in ("looming_gain", "left_right_gain", "damage_gain", "tracking_gain", "proximity_gain", "health_stress_gain", "cap")):
             raise ValueError("encoder gains must be nonnegative")
         if self.decoder.minimum_activity < 0 or self.decoder.hysteresis < 0:
             raise ValueError("decoder thresholds must be nonnegative")

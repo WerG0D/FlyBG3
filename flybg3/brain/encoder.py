@@ -19,6 +19,10 @@ class SensoryEncoder:
         drive = {f"{t}_{s}": 0.0 for t in SENSORY_TYPES for s in "LR"}
         target = observation.get("nearest_hostile")
         damage = min(1.0, observation.get("stimuli", {}).get("damage_fraction", 0.0))
+        npc = observation.get("npc", {})
+        hp = npc.get("hp", 0)
+        max_hp = npc.get("max_hp", 0)
+        health_stress = max(0.0, min(1.0, 1.0 - hp / max_hp)) if max_hp > 0 else 0.0
         if target and target["visible"] and target["distance"] <= c.max_distance:
             distance = max(target["distance"], c.object_radius)
             size = 2 * math.atan(c.object_radius / distance)
@@ -39,7 +43,7 @@ class SensoryEncoder:
             strengths = {"LPLC2": growth * c.looming_gain,
                          "LC4": growth * c.looming_gain,
                          "LPLC1": growth * c.looming_gain / (1 + size),
-                         "LC10a": c.tracking_gain}
+                         "LC10a": c.tracking_gain + c.proximity_gain * c.object_radius / (distance + c.object_radius)}
             for side, weight in (("L", (1 - lateral) / 2), ("R", (1 + lateral) / 2)):
                 for t, value in strengths.items():
                     drive[f"{t}_{side}"] = min(c.cap, value * weight)
@@ -48,5 +52,6 @@ class SensoryEncoder:
         # Damage is an explicit experimental proxy for a nondirectional threat,
         # not a claim of stimulating identified nociceptors.
         for side in "LR":
-            drive[f"LC4_{side}"] = min(c.cap, drive[f"LC4_{side}"] + damage * c.damage_gain / 2)
+            drive[f"LC4_{side}"] = min(c.cap, drive[f"LC4_{side}"]
+                                         + (damage * c.damage_gain + health_stress * c.health_stress_gain) / 2)
         return drive
