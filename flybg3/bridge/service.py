@@ -71,7 +71,7 @@ class BridgeService:
                     self.simulation.reset()
                 self.session = observation["session_id"]
             action, record = self.simulation.decide(observation)
-            if record["timings"]["total_ms"] > self.config.performance.decision_timeout_ms:
+            if record["timings"].get("decision_path_ms", record["timings"]["total_ms"]) > self.config.performance.decision_timeout_ms:
                 record["neural_action_before_timeout"] = action.to_dict()
                 action = Action(observation["session_id"], observation["request_id"], observation["npc"]["uuid"],
                                 debug={"error": "decision_timeout", "timings": record["timings"]})
@@ -84,12 +84,22 @@ class BridgeService:
         self.last_request = observation["request_id"]
         self.session = observation["session_id"]
         record["action"] = action.to_dict()
+        if "telemetry" in record:
+            record["telemetry"]["decision"] = action.action.upper()
         record["recorded_at"] = datetime.now(timezone.utc).isoformat()
         # Audit before publication. A logging failure stops this request safely.
         with self.log_path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(record, allow_nan=False) + "\n")
             f.flush()
         atomic_write_json(self.directory / "action.json", action.to_dict())
+        if "telemetry" in record:
+            try:
+                started = time.perf_counter()
+                atomic_write_json(self.directory / "telemetry.json", record["telemetry"])
+                LOG.debug("Telemetry compute %.2f ms; write %.2f ms",
+                          record["telemetry"]["telemetry_compute_ms"], (time.perf_counter() - started) * 1000)
+            except Exception:
+                LOG.exception("Telemetry write failed; neural action already published")
         LOG.info("Decision: %s; scores=%s; timings=%s", action.action.upper(), record["scores"], record.get("timings", {}))
         LOG.debug("Stimulus=%s descending=%s", record["stimulus"], record["neural_activity"])
         return True

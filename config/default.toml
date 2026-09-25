@@ -36,3 +36,13 @@ npc_uuid = "" # optional UUID filter; FLYBG3_NPC_UUID overrides this
 log_directory = "logs"
 log_level = "INFO"
 max_json_bytes = 262144
+
+[telemetry]
+enabled = true # passive spike probes; false leaves the neural decision unchanged
+smoothing = 0.25 # display EMA only: current-sample contribution
+
+[telemetry.scale]
+steering_max_hz = 10.0 # bar saturation; raw Hz remains visible
+escape_max_hz = 50.0
+grooming_max_hz = 10.0
+dopamine_max_hz = 50.0 # model PAM/PPL1 can have high tonic firing

@@ -57,20 +57,43 @@ class BridgeConfig:
 
 
 @dataclass
+class TelemetryScaleConfig:
+    steering_max_hz: float = 10.0
+    escape_max_hz: float = 50.0
+    grooming_max_hz: float = 10.0
+    dopamine_max_hz: float = 50.0
+
+
+@dataclass
+class TelemetryConfig:
+    enabled: bool = True
+    smoothing: float = 0.25  # display EMA: current-sample contribution
+    scale: TelemetryScaleConfig = field(default_factory=TelemetryScaleConfig)
+
+
+@dataclass
 class Config:
     brain: BrainConfig = field(default_factory=BrainConfig)
     encoder: EncoderConfig = field(default_factory=EncoderConfig)
     decoder: DecoderConfig = field(default_factory=DecoderConfig)
     performance: PerformanceConfig = field(default_factory=PerformanceConfig)
     bridge: BridgeConfig = field(default_factory=BridgeConfig)
+    telemetry: TelemetryConfig = field(default_factory=TelemetryConfig)
 
     def validate(self) -> None:
         import math
-        for section in (self.brain, self.encoder, self.decoder, self.performance, self.bridge):
+        for section in (self.brain, self.encoder, self.decoder, self.performance, self.bridge,
+                        self.telemetry, self.telemetry.scale):
             defaults = type(section)()
             for f in fields(section):
                 v, default = getattr(section, f.name), getattr(defaults, f.name)
-                if isinstance(default, int) and (type(v) is not int):
+                if isinstance(default, TelemetryScaleConfig):
+                    if not isinstance(v, TelemetryScaleConfig):
+                        raise ValueError("telemetry.scale must be a table")
+                elif isinstance(default, bool):
+                    if type(v) is not bool:
+                        raise ValueError(f"{f.name} must be boolean")
+                elif isinstance(default, int) and (type(v) is not int):
                     raise ValueError(f"{f.name} must be integer")
                 if isinstance(default, float) and (type(v) not in (float, int) or not math.isfinite(v)):
                     raise ValueError(f"{f.name} must be finite number")
@@ -97,6 +120,10 @@ class Config:
             raise ValueError("encoder gains must be nonnegative")
         if self.decoder.minimum_activity < 0 or self.decoder.hysteresis < 0:
             raise ValueError("decoder thresholds must be nonnegative")
+        if not 0 <= self.telemetry.smoothing <= 1:
+            raise ValueError("telemetry.smoothing must be in [0,1]")
+        if any(getattr(self.telemetry.scale, f.name) <= 0 for f in fields(self.telemetry.scale)):
+            raise ValueError("telemetry visual scales must be positive")
 
     def directory(self) -> Path:
         if self.bridge.directory:
@@ -116,6 +143,9 @@ def load_config(path: str | Path | None = None) -> Config:
             if name not in {f.name for f in fields(config)}:
                 raise ValueError(f"Unknown section: {name}")
             cls = type(getattr(config, name))
+            if name == "telemetry" and "scale" in values:
+                values = dict(values)
+                values["scale"] = TelemetryScaleConfig(**values["scale"])
             setattr(config, name, cls(**values))
     if os.environ.get("FLYBG3_NPC_UUID"):
         config.bridge.npc_uuid = os.environ["FLYBG3_NPC_UUID"].lower()

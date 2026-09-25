@@ -4,8 +4,12 @@ from __future__ import annotations
 from collections import deque
 import logging
 import numpy as np
+from typing import TYPE_CHECKING
 from flybg3.config import Config
 from .neuron_groups import MOTOR_TYPES, resolve_groups, resolve_candidate_groups
+
+if TYPE_CHECKING:
+    from flybg3.telemetry.collector import TelemetryCollector
 
 
 class FlyBrainAdapter:
@@ -30,12 +34,20 @@ class FlyBrainAdapter:
         for _ in range(self.config.brain.warmup_steps):
             self.brain.step()
 
-    def simulate(self, stimulus: dict[str, float]) -> dict:
+    def simulate(self, stimulus: dict[str, float], observer: TelemetryCollector | None = None) -> dict:
         injections = [(self.groups[k], value) for k, value in stimulus.items() if value > 0]
         window: deque[dict[str, int]] = deque(maxlen=self.config.decoder.decision_window)
         total = {k: 0 for k in self.motor}
         for _ in range(self.config.brain.simulation_steps):
             fired = self.brain.step(inject=injections)
+            if observer is not None:
+                try:
+                    observer.observe(fired)
+                except Exception:
+                    # Display failures never replace or suppress a neural decision.
+                    logging.getLogger("FlyBG3").exception("Telemetry probe disabled for this decision")
+                    observer.failed = True
+                    observer = None
             counts = {k: int(np.isin(fired, idx).sum()) for k, idx in self.motor.items()}
             window.append(counts)
             for k, v in counts.items():

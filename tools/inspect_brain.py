@@ -13,10 +13,23 @@ def main() -> None:
     parser.add_argument("--config")
     parser.add_argument("--output", type=Path)
     parser.add_argument("--verify-hashes", action="store_true")
+    parser.add_argument("--telemetry", action="store_true", help="Validate optional telemetry groups in MaleCNS")
     args = parser.parse_args()
     c = load_config(args.config)
     brain = FlyBrainAdapter(c)
     report = brain.info()
+    if args.telemetry:
+        from flybg3.telemetry.registry import resolve_telemetry_groups, TELEMETRY_GROUPS
+        resolved = resolve_telemetry_groups(brain.brain)
+        report["telemetry_groups"] = {
+            definition.name: {
+                "label": definition.label, "cell_types": list(definition.cell_types),
+                "side": definition.side, "neurons": resolved[definition.name].neuron_count,
+                "type_counts": resolved[definition.name].type_counts,
+                "default": definition.default,
+            } if definition.name in resolved else {"available": False, "cell_types": list(definition.cell_types)}
+            for definition in TELEMETRY_GROUPS
+        }
     if args.verify_hashes:
         from flybrain.data import DATA, FILES
         root = Path(c.brain.data) if c.brain.data else DATA
