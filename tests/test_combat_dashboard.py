@@ -176,4 +176,7 @@ def test_dashboard_probe_does_not_change_real_brain_or_action(observation):
     features_b = NeuralFeatureExtractor().extract(record_b["neural_activity"])
     assert features_a == features_b
     assert FrozenPolicy(seed=42).select_action(features_a, training=False) == FrozenPolicy(seed=42).select_action(features_b, training=False)
+    from flybg3.combat.policy_gradient import FrozenPolicyGradient
+    assert (FrozenPolicyGradient(seed=42).select_action(features_a, training=False)
+            == FrozenPolicyGradient(seed=42).select_action(features_b, training=False))
     assert "visualization" in record_b and "visualization" not in record_a

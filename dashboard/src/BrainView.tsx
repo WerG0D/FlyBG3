@@ -24,8 +24,8 @@ export default function BrainView({ structure, active }: Props) {
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     let frame = 0, last = 0
     const draw = (now: number) => {
-      frame = requestAnimationFrame(draw)
-      if (now - last < 33) return
+      if (!reducedMotion) frame = requestAnimationFrame(draw)
+      if (!reducedMotion && now - last < 33) return
       last = now
       const width = element.clientWidth, height = element.clientHeight
       const scale = window.devicePixelRatio || 1
