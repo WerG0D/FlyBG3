@@ -35,6 +35,8 @@ function Bar({ name, value, max }: { name: string; value: Activity; max: number 
 export default function App() {
   const [events, setEvents] = useState<Event[]>([])
   const [structure, setStructure] = useState<Connectome | null>(null)
+  const [structureError, setStructureError] = useState(false)
+  const [manifest, setManifest] = useState<Record<string, any> | null>(null)
   const [connected, setConnected] = useState(false)
   const [run, setRun] = useState<string | null>(null)
   const runRef = useRef<string | null>(null)
@@ -43,12 +45,32 @@ export default function App() {
   const [controlMessage, setControlMessage] = useState('')
 
   useEffect(() => {
-    fetch('/connectome.json').then(r => r.json()).then(setStructure).catch(() => {})
+    let active = true
+    let structureLoaded = false
+    const loadStructure = () => {
+      if (structureLoaded) return
+      fetch('/connectome.json').then(r => {
+        if (!r.ok) throw new Error(`connectome HTTP ${r.status}`)
+        return r.json()
+      }).then((data: Connectome) => {
+        if (!active) return
+        structureLoaded = true
+        setStructure(data)
+        setStructureError(false)
+      }).catch(() => { if (active) setStructureError(true) })
+    }
+    loadStructure()
+    const retryStructure = window.setInterval(loadStructure, 5000)
+    const loadManifest = () => fetch('/api/manifest').then(r => {
+      if (!r.ok) throw new Error(`manifest HTTP ${r.status}`)
+      return r.json()
+    }).then(data => { if (active) setManifest(data) }).catch(() => {})
+    loadManifest()
     fetch('/api/history').then(r => r.json()).then((history: Event[]) => {
       if (Array.isArray(history)) setEvents(history.slice(-MAX_EVENTS))
     }).catch(() => {})
     const source = new EventSource('/events')
-    source.onopen = () => setConnected(true)
+    source.onopen = () => { setConnected(true); loadStructure(); loadManifest() }
     source.onerror = () => setConnected(false)
     source.onmessage = message => {
       try {
@@ -59,13 +81,14 @@ export default function App() {
             runRef.current = nextRun
             setRun(nextRun)
             setEvents([event])
+            loadManifest()
             return
           }
         }
         setEvents(previous => [...previous, event].slice(-MAX_EVENTS))
       } catch { /* a broken dashboard event cannot affect the bridge */ }
     }
-    return () => source.close()
+    return () => { active = false; window.clearInterval(retryStructure); source.close() }
   }, [])
 
   const visible = useMemo(() => view === 'replay' && selectedEpisode !== null
@@ -91,6 +114,12 @@ export default function App() {
     : metrics?.phase === 'train' ? 'TRAINING' : 'OBSERVE'
   const physical = combat?.source === 'synthetic_arena' ? 'SYNTHETIC ARENA' : 'BG3 GAME STATE'
   const paused = latest(events, 'system_status')?.payload?.status === 'paused'
+  const algorithm = manifest?.config?.combat?.algorithm === 'reinforce' ? 'REINFORCE' : 'TD READOUT'
+  const policyKind = manifest?.policy?.toUpperCase() || 'POLICY'
+  const actionLabel = policy?.action?.replaceAll('_', ' ').toUpperCase() ?? 'AWAITING SIGNAL'
+  const healthWidth = (hp: unknown, maxHp: unknown) =>
+    typeof hp === 'number' && typeof maxHp === 'number' && maxHp > 0
+      ? `${Math.max(0, Math.min(100, hp / maxHp * 100))}%` : '0%'
   const sendControl = async (command: string) => {
     try {
       const response = await fetch('/api/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ command }) })
@@ -102,19 +131,21 @@ export default function App() {
   return <div className="app-shell">
     <header className="topbar">
       <div className="brand"><div className="brand-mark">F<span>·</span></div><div><strong>FlyBG3</strong><small>COMBAT LEARNING LAB</small></div></div>
-      <div className="top-status"><span className={`status-dot ${connected ? 'online' : ''}`} /> {connected ? 'STREAM CONNECTED' : 'WAITING FOR STREAM'} <span className="divider" /> MaleCNS v1.0 <span className="divider" /> {mode}</div>
+      <div className="top-status"><span className={`status-dot ${connected ? 'online' : ''}`} /> {connected ? 'LIVE STREAM' : 'STREAM OFFLINE'} <span className="divider" /> MaleCNS v1.0 <span className="divider" /> {mode}</div>
       <div className="top-clock">EPISODE <strong>{latest(events, 'episode_end')?.episode_id ?? '—'}</strong><span className="top-clock-line">{run ? run.split(/[\\/]/).pop() : 'NO RUN SELECTED'}</span></div>
     </header>
 
+    <div className="lab-intro"><div><span className="eyebrow">LIVE EXPERIMENT / {algorithm}</span><h1>Neural combat observatory<span>.</span></h1><p>A fixed connectome. A trainable readout. Every action traceable to simulated neural activity.</p></div><div className="intro-data"><span>RUN ID</span><strong>{run ? run.split(/[\\/]/).pop() : 'AWAITING RUN'}</strong><span>POLICY</span><strong>{policyKind}</strong></div></div>
     <main className="dashboard-grid">
       <section className="card brain-card"><div className="card-head"><div><span className="eyebrow">01 / CONNECTOME</span><h2>Neural field</h2></div><span className="head-note">ANATOMICAL PROJECTION · DRAG TO ROTATE</span></div>
         <BrainView structure={structure} active={visualization} />
+        {!structure && <div className="brain-loading" role="status">{structureError ? 'Connectome unavailable · retrying automatically' : 'Loading anatomical sample…'}</div>}
         <div className="brain-footer"><span><i className="legend-dot basal" /> STRUCTURAL SAMPLE</span><span><i className="legend-dot active" /> SPIKED IN WINDOW</span><span><i className="legend-dot edge" /> SAMPLED CONNECTIONS</span></div>
       </section>
 
       <section className="card combat-card"><div className="card-head"><div><span className="eyebrow">02 / ENVIRONMENT</span><h2>Combat state</h2></div><span className="section-tag">{physical}</span></div>
-        <div className="hp-block"><div><span>FLYMAN</span><strong>{combat?.npc_hp ?? '—'} <small>HP</small></strong></div><div className="hp-bar"><div style={{ width: `${Math.max(0, Math.min(100, (combat?.npc_hp || 0) / 22 * 100))}%` }} /></div></div>
-        <div className="hp-block hostile"><div><span>HOSTILE</span><strong>{combat?.enemy_hp ?? '—'} <small>HP</small></strong></div><div className="hp-bar"><div style={{ width: `${Math.max(0, Math.min(100, (combat?.enemy_hp || 0) / 20 * 100))}%` }} /></div></div>
+        <div className="hp-block"><div><span>FLYMAN</span><strong>{combat?.npc_hp ?? '—'} <small>/ {combat?.npc_max_hp ?? '—'} HP</small></strong></div><div className="hp-bar"><div style={{ width: healthWidth(combat?.npc_hp, combat?.npc_max_hp) }} /></div></div>
+        <div className="hp-block hostile"><div><span>HOSTILE</span><strong>{combat?.enemy_hp ?? '—'} <small>/ {combat?.enemy_max_hp ?? '—'} HP</small></strong></div><div className="hp-bar"><div style={{ width: healthWidth(combat?.enemy_hp, combat?.enemy_max_hp) }} /></div></div>
         <div className="metric-grid"><div><span>SEPARATION</span><strong>{number(combat?.distance)} <small>m</small></strong></div><div><span>TURN</span><strong>{combat?.my_turn ? 'FLYMAN' : '—'}</strong></div><div><span>DATA SOURCE</span><strong>{combat?.source === 'synthetic_arena' ? 'SIMULATED' : 'BG3 / NONE'}</strong></div><div><span>DECISION WINDOW</span><strong>{number(neural?.telemetry?.window_seconds, 2)} <small>s</small></strong></div></div>
         <div className="mode-warning">GAME STATE IS DISPLAY ONLY. THE POLICY RECEIVES NEURAL RATES.</div>
       </section>
@@ -125,9 +156,10 @@ export default function App() {
         <div className="activity-foot"><span>ACTIVE NEURONS <strong>{neural?.telemetry?.active_neurons?.toLocaleString() ?? '—'}</strong></span><span>TOTAL SPIKES <strong>{neural?.telemetry?.total_spikes?.toLocaleString() ?? '—'}</strong></span></div>
       </section>
 
-      <section className="card action-card"><div className="card-head"><div><span className="eyebrow">04 / NEURAL READOUT</span><h2>Action & outcome</h2></div><span className="section-tag cyan">{policy?.explore ? 'EXPLORE' : 'EXPLOIT'}</span></div>
-        <div className="hero-action">{policy?.action?.replace('_', ' ').toUpperCase() ?? 'WAITING'}</div>
-        <div className="action-details"><div><span>EXECUTION</span><strong className={execution?.status === 'invalid' ? 'danger' : ''}>{execution?.status?.toUpperCase() ?? 'PENDING'}</strong></div><div><span>ε / EXPLORATION</span><strong>{number(policy?.epsilon, 3)}</strong></div><div><span>POLICY LATENCY</span><strong>{number(policy?.policy_ms, 2)} ms</strong></div><div><span>BRAIN LATENCY</span><strong>{number(neural?.brain_ms, 1)} ms</strong></div></div>
+      <section className="card action-card"><div className="card-head"><div><span className="eyebrow">04 / NEURAL READOUT</span><h2>Action & outcome</h2></div><span className="section-tag cyan">{mode === 'EVALUATION' ? 'DETERMINISTIC' : policy?.explore ? 'SAMPLED' : 'GREEDY'}</span></div>
+        <div className="action-kicker">{mode} <span>→</span> {policyKind} <span>→</span> {algorithm}</div>
+        <div className="hero-action">{actionLabel}</div>
+        <div className="action-details"><div><span>EXECUTION</span><strong className={execution?.status === 'invalid' ? 'danger' : ''}>{execution?.status?.toUpperCase() ?? 'PENDING'}</strong></div><div><span>{algorithm === 'REINFORCE' ? 'EXPLORATION' : 'ε / EXPLORATION'}</span><strong>{algorithm === 'REINFORCE' ? (policy?.explore ? 'STOCHASTIC SAMPLE' : 'ARGMAX / EVAL') : number(policy?.epsilon, 3)}</strong></div><div><span>POLICY LATENCY</span><strong>{number(policy?.policy_ms, 2)} ms</strong></div><div><span>BRAIN LATENCY</span><strong>{number(neural?.brain_ms, 1)} ms</strong></div></div>
         {execution?.reason && <div className="invalid-reason">{execution.reason}</div>}
       </section>
 

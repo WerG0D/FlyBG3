@@ -71,7 +71,9 @@ class EpisodeRunner:
                         "visualization": record.get("visualization")})
             self._emit("combat_state", episode_id, request_id,
                        {"npc_hp": observation["npc"]["hp"],
+                        "npc_max_hp": observation["npc"]["max_hp"],
                         "enemy_hp": observation["nearest_hostile"]["hp"],
+                        "enemy_max_hp": observation["nearest_hostile"]["max_hp"],
                         "distance": observation["nearest_hostile"]["distance"],
                         "my_turn": True, "source": "synthetic_arena"})
             return features, record
@@ -79,6 +81,7 @@ class EpisodeRunner:
         features, record = evaluate()
         while True:
             if self.before_decision and self.before_decision(episode_id, request_id) == "reset_episode":
+                self.policy.end_episode(training=False)
                 episode.end("aborted", _time())
                 self._emit("episode_end", episode_id, request_id,
                            {"result": "aborted", "total_reward": episode.total_reward,

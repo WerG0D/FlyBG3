@@ -184,6 +184,9 @@ def test_closed_loop_reward_after_outcome_and_dashboard_cannot_change_action():
     event_names = [e["event"] for e in events_off]
     assert event_names.index("action_result") < event_names.index("reward")
     assert event_names.index("reward") < event_names.index("episode_end")
+    combat = next(e["payload"] for e in events_off if e["event"] == "combat_state")
+    assert 0 <= combat["npc_hp"] <= combat["npc_max_hp"]
+    assert 0 <= combat["enemy_hp"] <= combat["enemy_max_hp"]
 
 
 def test_training_resumes_checkpoint_and_skips_old_arena_seeds(tmp_path):

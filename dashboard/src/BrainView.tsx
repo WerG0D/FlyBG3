@@ -21,6 +21,7 @@ export default function BrainView({ structure, active }: Props) {
     const element = canvas.current
     if (!element || !structure) return
     const ctx = element.getContext('2d')!
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     let frame = 0, last = 0
     const draw = (now: number) => {
       frame = requestAnimationFrame(draw)
@@ -36,7 +37,7 @@ export default function BrainView({ structure, active }: Props) {
       const gradient = ctx.createRadialGradient(width * .5, height * .48, 20, width * .5, height * .48, width * .6)
       gradient.addColorStop(0, '#143038'); gradient.addColorStop(1, '#09161f')
       ctx.fillStyle = gradient; ctx.fillRect(0, 0, width, height)
-      if (!dragging.current) angle.current += .0006
+      if (!dragging.current && !reducedMotion) angle.current += .0006
       const cos = Math.cos(angle.current), sin = Math.sin(angle.current)
       const project = (node: Node) => {
         const [x, y, z] = node.position
