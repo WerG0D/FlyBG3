@@ -99,11 +99,15 @@ class CombatConfig:
     mode: str = "observe" # observe | validate | train | eval
     physical_actions_enabled: bool = False
     policy: str = "trainable" # trainable | frozen | random
+    algorithm: str = "td" # td | reinforce (external readout only)
     learning_rate: float = 0.05
     discount: float = 0.9
     epsilon: float = 0.2
     epsilon_decay: float = 0.995
     epsilon_floor: float = 0.02
+    reinforce_temperature: float = 1.0
+    reinforce_return_scale: float = 4.0
+    reinforce_gradient_clip: float = 10.0
     max_turns: int = 24
 
 
@@ -191,8 +195,13 @@ class Config:
             raise ValueError("invalid combat.mode")
         if self.combat.policy not in {"trainable", "frozen", "random"}:
             raise ValueError("invalid combat.policy")
+        if self.combat.algorithm not in {"td", "reinforce"}:
+            raise ValueError("invalid combat.algorithm")
         if not 0 < self.combat.learning_rate <= 1 or not 0 <= self.combat.discount <= 1:
             raise ValueError("invalid combat learning parameters")
+        if min(self.combat.reinforce_temperature, self.combat.reinforce_return_scale,
+               self.combat.reinforce_gradient_clip) <= 0:
+            raise ValueError("invalid policy-gradient scale or clipping")
         if not 0 <= self.combat.epsilon_floor <= self.combat.epsilon <= 1 or not 0 < self.combat.epsilon_decay <= 1:
             raise ValueError("invalid combat exploration parameters")
         if self.combat.max_turns < 1 or not 1 <= self.dashboard.port <= 65535:

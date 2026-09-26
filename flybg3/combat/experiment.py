@@ -20,6 +20,7 @@ from flybg3.config import Config
 
 from .arena import CombatArena
 from .policy import FrozenPolicy, RandomPolicy, TrainableNeuralReadoutPolicy
+from .policy_gradient import FrozenPolicyGradient, PolicyGradientReadoutPolicy
 from .reward import RewardEngine
 from .runner import EpisodeRunner
 
@@ -37,6 +38,7 @@ def manifest(config: Config, seed: int, policy: str, brain_info: dict) -> dict:
     source_files = ("flybg3/brain/encoder.py", "flybg3/brain/fly_brain.py",
                     "flybg3/brain/simulation.py", "flybg3/combat/arena.py",
                     "flybg3/combat/features.py", "flybg3/combat/policy.py",
+                    "flybg3/combat/policy_gradient.py",
                     "flybg3/combat/reward.py", "flybg3/combat/runner.py",
                     "flybg3/combat/experiment.py", "flybg3/telemetry/connectome.py")
     source_hashes = {name: hashlib.sha256((project_root / name).read_bytes()).hexdigest()
@@ -49,7 +51,8 @@ def manifest(config: Config, seed: int, policy: str, brain_info: dict) -> dict:
             "git_dirty": bool(_git("status", "--porcelain")),
             "source_sha256": source_hashes,
             "config_sha256": hashlib.sha256(raw).hexdigest(), "config": asdict(config),
-            "policy_version": "linear_q_td_v1", "reward": asdict(config.reward)}
+            "policy_version": ("linear_softmax_reinforce_v1" if config.combat.algorithm == "reinforce"
+                               else "linear_q_td_v1"), "reward": asdict(config.reward)}
 
 
 class RunStore:
@@ -61,6 +64,7 @@ class RunStore:
         atomic_write_json(root / "manifest.json", manifest_data)
         self.last_control_token = None
         self.paused = False
+        self.pending_checkpoint = False
 
     def event(self, event: dict) -> None:
         # Append-only, bounded group-level event. No full voltage/spike arrays.
@@ -86,12 +90,16 @@ class RunStore:
                                 "request_id": request_id, "timestamp": datetime.now(timezone.utc).isoformat(),
                                 "payload": {"status": "episode_reset_requested"}})
                     return "reset_episode"
-                elif kind == "checkpoint" and isinstance(policy, TrainableNeuralReadoutPolicy):
-                    checkpoint = self.root / "checkpoints" / f"policy_manual_{uuid4().hex[:8]}.json"
-                    policy.save(checkpoint, {"episode": episode_id, "run_manifest": "../manifest.json"})
-                    self.event({"schema_version": 1, "event": "checkpoint", "episode_id": episode_id,
-                                "request_id": request_id, "timestamp": datetime.now(timezone.utc).isoformat(),
-                                "payload": {"path": str(checkpoint)}})
+                elif kind == "checkpoint" and isinstance(policy, (TrainableNeuralReadoutPolicy,
+                                                                  PolicyGradientReadoutPolicy)):
+                    if isinstance(policy, PolicyGradientReadoutPolicy):
+                        self.pending_checkpoint = True
+                    else:
+                        checkpoint = self.root / "checkpoints" / f"policy_manual_{uuid4().hex[:8]}.json"
+                        policy.save(checkpoint, {"episode": episode_id, "run_manifest": "../manifest.json"})
+                        self.event({"schema_version": 1, "event": "checkpoint", "episode_id": episode_id,
+                                    "request_id": request_id, "timestamp": datetime.now(timezone.utc).isoformat(),
+                                    "payload": {"path": str(checkpoint)}})
                 self.event({"schema_version": 1, "event": "system_status", "episode_id": episode_id,
                             "request_id": request_id, "timestamp": datetime.now(timezone.utc).isoformat(),
                             "payload": {"status": "paused" if self.paused else "running", "command": kind}})
@@ -104,6 +112,16 @@ def make_policy(name: str, seed: int, config: Config):
     c = config.combat
     if name == "random":
         return RandomPolicy(seed)
+    if c.algorithm == "reinforce":
+        kwargs = dict(seed=seed, learning_rate=c.learning_rate, discount=c.discount,
+                      temperature=c.reinforce_temperature,
+                      return_scale=c.reinforce_return_scale,
+                      gradient_clip=c.reinforce_gradient_clip)
+        if name == "frozen":
+            return FrozenPolicyGradient(**kwargs)
+        if name == "trainable":
+            return PolicyGradientReadoutPolicy(**kwargs)
+        raise ValueError(f"unknown policy {name}")
     kwargs = dict(seed=seed, learning_rate=c.learning_rate, discount=c.discount,
                   epsilon=c.epsilon, epsilon_decay=c.epsilon_decay, epsilon_floor=c.epsilon_floor)
     if name == "frozen":
@@ -111,6 +129,15 @@ def make_policy(name: str, seed: int, config: Config):
     if name == "trainable":
         return TrainableNeuralReadoutPolicy(**kwargs)
     raise ValueError(f"unknown policy {name}")
+
+
+def load_policy(path: Path):
+    algorithm = json.loads(path.read_text(encoding="utf-8")).get("algorithm")
+    if algorithm == PolicyGradientReadoutPolicy.algorithm:
+        return PolicyGradientReadoutPolicy.load(path)
+    if algorithm == "linear_q_td":
+        return TrainableNeuralReadoutPolicy.load(path)
+    raise ValueError("unknown checkpoint algorithm")
 
 
 def summarize(episodes: list) -> dict:
@@ -151,12 +178,17 @@ def run_control(config: Config, name: str, seed: int, train_episodes: int, eval_
     if checkpoint is not None and (name not in {"trainable", "shuffled", "zero"}
                                    or (name != "trainable" and train_episodes)):
         raise ValueError("checkpoint ablations require evaluation-only mode")
-    policy = (TrainableNeuralReadoutPolicy.load(checkpoint) if checkpoint is not None
+    policy = (load_policy(checkpoint) if checkpoint is not None
               else make_policy(policy_name, seed, config))
+    if checkpoint is not None and (isinstance(policy, PolicyGradientReadoutPolicy)
+                                   != (config.combat.algorithm == "reinforce")):
+        raise ValueError("checkpoint algorithm differs from config.combat.algorithm")
     if checkpoint is not None and policy.seed != seed:
         raise ValueError("checkpoint seed differs from requested seed")
     if exploration is not None:
-        if name != "trainable" or train_episodes < 1 or not policy.epsilon_floor <= exploration <= 1:
+        if (name != "trainable" or train_episodes < 1
+                or not isinstance(policy, TrainableNeuralReadoutPolicy)
+                or not policy.epsilon_floor <= exploration <= 1):
             raise ValueError("exploration override requires trainable training run and valid epsilon")
         policy.epsilon = exploration
     episode_offset = policy.episodes if checkpoint is not None else 0
@@ -191,6 +223,15 @@ def run_control(config: Config, name: str, seed: int, train_episodes: int, eval_
         (training if is_train else evaluation).append(episode)
         if store:
             store.episode(episode)
+            if store.pending_checkpoint:
+                deferred_checkpoint = store.root / "checkpoints" / f"policy_manual_{uuid4().hex[:8]}.json"
+                policy.save(deferred_checkpoint,
+                            {"episode": i, "run_manifest": "../manifest.json", "deferred": True})
+                store.event({"schema_version": 1, "event": "checkpoint", "episode_id": i,
+                             "request_id": episode.turn_count,
+                             "timestamp": datetime.now(timezone.utc).isoformat(),
+                             "payload": {"path": str(deferred_checkpoint)}})
+                store.pending_checkpoint = False
             seen = training if is_train else evaluation
             store.event({"schema_version": 1, "event": "training_metrics", "episode_id": i,
                          "request_id": episode.turn_count, "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -200,13 +241,13 @@ def run_control(config: Config, name: str, seed: int, train_episodes: int, eval_
                                      "reward_series": [e.total_reward for e in seen],
                                      "win_series": [int(e.result == "victory") for e in seen]}})
             if policy_name == "trainable" and learn and i % 10 == 0:
-                checkpoint = store.root / "checkpoints" / f"policy_episode_{i:04d}.json"
-                policy.save(checkpoint,
+                periodic_checkpoint = store.root / "checkpoints" / f"policy_episode_{i:04d}.json"
+                policy.save(periodic_checkpoint,
                             {"episode": i, "run_manifest": "../manifest.json"})
                 store.event({"schema_version": 1, "event": "checkpoint", "episode_id": i,
                              "request_id": episode.turn_count,
                              "timestamp": datetime.now(timezone.utc).isoformat(),
-                             "payload": {"path": str(checkpoint)}})
+                             "payload": {"path": str(periodic_checkpoint)}})
     if store:
         if policy_name == "trainable" and train_episodes:
             policy.save(store.root / "checkpoints" / f"policy_final_{uuid4().hex[:8]}.json",
@@ -263,7 +304,7 @@ def evaluate_generalization(config: Config, validation_path: Path, episodes_per_
         if len(checkpoints) != 1:
             raise RuntimeError(f"expected exactly one final checkpoint: {run_directory}")
         checkpoint = checkpoints[0]
-        frozen = TrainableNeuralReadoutPolicy.load(checkpoint)
+        frozen = load_policy(checkpoint)
         before_weights = [weights[:] for weights in frozen.weights]
         config.brain.seed = seed
         runner = EpisodeRunner(Simulation(config), frozen, RewardEngine(config.reward))

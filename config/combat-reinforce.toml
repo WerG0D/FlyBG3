@@ -1,0 +1,42 @@
+[brain]
+simulation_steps = 50
+dt = 0.02
+seed = 42
+
+[encoder]
+# Experimental proxies. The regular validated bridge keeps these at zero.
+health_stress_gain = 0.4
+proximity_gain = 0.6
+
+[combat]
+mode = "observe"
+physical_actions_enabled = false
+policy = "trainable"
+algorithm = "reinforce"
+# Episodic reward-to-go on a stochastic linear softmax readout.
+learning_rate = 0.15
+discount = 0.98
+reinforce_temperature = 1.0
+reinforce_return_scale = 4.0
+reinforce_gradient_clip = 10.0
+epsilon = 0.2
+epsilon_decay = 0.995
+epsilon_floor = 0.02
+max_turns = 24
+
+[reward]
+damage_dealt_scale = 0.02
+damage_received_scale = -0.02
+enemy_kill = 1.0
+self_death = -1.0
+victory = 3.0
+defeat = -3.0
+invalid_action = -0.05
+timeout = -1.0
+
+[dashboard]
+enabled = true
+host = "127.0.0.1"
+port = 8765
+max_active_neurons = 300
+max_edges = 200

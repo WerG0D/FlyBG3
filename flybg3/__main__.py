@@ -20,6 +20,8 @@ def main() -> None:
     parser.add_argument("--speech", action="store_true", help="Enable optional neural speech for this bridge run")
     parser.add_argument("--mode", choices=["observe", "validate", "train", "eval"])
     parser.add_argument("--policy", choices=["random", "frozen", "trainable", "shuffled", "zero"])
+    parser.add_argument("--algorithm", choices=["td", "reinforce"],
+                        help="External combat readout algorithm; MaleCNS remains fixed")
     parser.add_argument("--opponent", choices=["A", "B", "C", "D"], default="A",
                         help="Synthetic arena opponent for arena training/evaluation")
     parser.add_argument("--exploration", type=float,
@@ -35,6 +37,9 @@ def main() -> None:
     args = parser.parse_args()
     lab_command = args.command in {"arena", "validate-learning", "generalize", "dashboard", "export-connectome"}
     config = load_config(args.config or ("config/combat-lab.toml" if lab_command else None))
+    if args.algorithm:
+        config.combat.algorithm = args.algorithm
+        config.validate()
     if args.directory:
         config.bridge.directory = args.directory
     if args.speech:
