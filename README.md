@@ -16,6 +16,8 @@ Antes do primeiro uso do painel, construa o frontend com `.\scripts\dashboard_bu
 
 Leia [COMBAT_LEARNING.md](docs/COMBAT_LEARNING.md), [LEARNING_RESEARCH.md](docs/LEARNING_RESEARCH.md), [REWARD_DESIGN.md](docs/REWARD_DESIGN.md) e [DASHBOARD.md](docs/DASHBOARD.md) para fórmulas, limites e controles. Uma melhoria no simulador **não** é evidência automática de aprendizado em BG3.
 
+Uma segunda política experimental usa retorno do episódio inteiro para atribuir crédito a ações anteriores. A fórmula, configuração e ablações estão em [POLICY_GRADIENT.md](docs/POLICY_GRADIENT.md). O algoritmo TD anterior continua selecionável por `config/combat-lab.toml`; ambos usam o mesmo MaleCNS congelado.
+
 **Estado do treino:** a avaliação inicial em A venceu, mas a política apenas repetiu `BASIC_ATTACK`; após continuação e currículo, as avaliações em C e D não venceram. Consulte [LEARNING_VALIDATION.md](docs/LEARNING_VALIDATION.md) e o resumo [continuation.json](experiments/continuation.json). O resultado é inconclusivo para aprendizado neural generalizável. Para continuar pesos de um checkpoint, use `python -m flybg3 arena --mode train --policy trainable --opponent D --episodes 40 --eval-episodes 8 --checkpoint CAMINHO_DO_CHECKPOINT`; `--exploration 0.7` aumenta apenas a busca durante o treino e fica registrado no manifest.
 
 O marco atual executa **movimento físico derivado da atividade neural**:

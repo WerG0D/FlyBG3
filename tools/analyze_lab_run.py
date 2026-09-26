@@ -8,11 +8,14 @@ from pathlib import Path
 from statistics import mean
 
 
-def analyze(run: Path) -> dict:
+def analyze(run: Path, *, min_episode: int = 0, max_episode: int | None = None) -> dict:
     grouped: dict[tuple[int, int], dict] = {}
     with (run / "events.jsonl").open(encoding="utf-8") as stream:
         for line in stream:
             event = json.loads(line)
+            if (event["episode_id"] < min_episode
+                    or (max_episode is not None and event["episode_id"] > max_episode)):
+                continue
             if event["event"] not in {"neural_state", "combat_state", "policy_decision"}:
                 continue
             key = (event["episode_id"], event["request_id"])
@@ -27,10 +30,17 @@ def analyze(run: Path) -> dict:
         return {name: mean(row["neural_state"]["features_hz"][name] for row in group)
                 if group else None for name in names}
     decisions = Counter(row["policy_decision"]["action"] for row in rows if "policy_decision" in row)
-    return {"schema_version": 1, "source": str(run), "paired_windows": len(rows),
+    near_decisions = Counter(row["policy_decision"]["action"] for row in near
+                             if "policy_decision" in row)
+    far_decisions = Counter(row["policy_decision"]["action"] for row in far
+                            if "policy_decision" in row)
+    return {"schema_version": 1, "source": str(run),
+            "min_episode": min_episode, "max_episode": max_episode,
+            "paired_windows": len(rows),
             "near_windows": len(near), "far_windows": len(far),
             "near_mean_hz": group_summary(near), "far_mean_hz": group_summary(far),
             "policy_decisions": dict(decisions),
+            "near_actions": dict(near_decisions), "far_actions": dict(far_decisions),
             "interpretation": "Observational diagnostic only; mean rate differences do not establish causal encoding."}
 
 
@@ -38,8 +48,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("run", type=Path)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--min-episode", type=int, default=0)
+    parser.add_argument("--max-episode", type=int)
     args = parser.parse_args()
-    result = analyze(args.run)
+    result = analyze(args.run, min_episode=args.min_episode,
+                     max_episode=args.max_episode)
     if args.output:
         from flybg3.bridge.atomic_io import atomic_write_json
         atomic_write_json(args.output, result)
