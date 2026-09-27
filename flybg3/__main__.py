@@ -34,6 +34,8 @@ def main() -> None:
     parser.add_argument("--input", type=Path)
     parser.add_argument("--checkpoint", type=Path,
                         help="Resume the neural readout from this checkpoint (arena train/eval)")
+    parser.add_argument("--combat-observe-checkpoint", type=Path,
+                        help="Log frozen combat candidates from real BG3 neural activity; never execute them")
     args = parser.parse_args()
     lab_command = args.command in {"arena", "validate-learning", "generalize", "dashboard", "export-connectome"}
     config = load_config(args.config or ("config/combat-lab.toml" if lab_command else None))
@@ -44,6 +46,8 @@ def main() -> None:
         config.bridge.directory = args.directory
     if args.speech:
         config.speech.enabled = True
+    if args.combat_observe_checkpoint and (args.command is not None or config.combat.mode != "observe"):
+        parser.error("combat observation checkpoint requires the BG3 bridge in observe mode")
     logging.basicConfig(level="DEBUG" if args.debug else config.bridge.log_level,
                         format="[FlyBG3] %(levelname)s: %(message)s")
     print(f"FlyBG3 {__version__}", flush=True)
@@ -109,8 +113,14 @@ def main() -> None:
         atomic_write_json(config.directory() / "control.json", {"command": "reset", "command_id": str(uuid4())})
         return
     from .bridge.service import BridgeService
+    probe = None
+    if args.combat_observe_checkpoint:
+        from .combat.shadow import CombatShadowProbe
+        probe = CombatShadowProbe(args.combat_observe_checkpoint,
+                                  algorithm=config.combat.algorithm, seed=config.brain.seed)
+        logging.getLogger("FlyBG3").info("Combat readout loaded in OBSERVE ONLY mode; no attack action will be sent to BG3")
     try:
-        BridgeService(config).run(once=args.once)
+        BridgeService(config, combat_probe=probe).run(once=args.once)
     except KeyboardInterrupt:
         logging.getLogger("FlyBG3").info("Bridge stopped")
 

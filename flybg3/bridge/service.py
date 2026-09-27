@@ -19,7 +19,7 @@ LOG = logging.getLogger("FlyBG3")
 
 
 class BridgeService:
-    def __init__(self, config: Config, simulation=None, speech=None):
+    def __init__(self, config: Config, simulation=None, speech=None, combat_probe=None):
         self.config = config
         self.directory = config.directory()
         self.directory.mkdir(parents=True, exist_ok=True)
@@ -33,6 +33,7 @@ class BridgeService:
         self.log_lock = threading.Lock()
         self.speech = speech if speech is not None else (
             SpeechRuntime(config.speech, self.directory, self._append_event) if config.speech.enabled else None)
+        self.combat_probe = combat_probe
 
     def _append_event(self, event: dict) -> None:
         with self.log_lock:
@@ -102,6 +103,19 @@ class BridgeService:
         # Audit before publication. A logging failure stops this request safely.
         self._append_event(record)
         atomic_write_json(self.directory / "action.json", action.to_dict())
+        # A candidate from the trainable combat readout is audit-only. The
+        # BG3-facing action has already been published by the original decoder.
+        if self.combat_probe and not action.debug.get("error"):
+            try:
+                shadow = self.combat_probe.inspect(
+                    record["neural_activity"], session_id=observation["session_id"],
+                    request_id=observation["request_id"])
+                self._append_event({"type": "combat_observe", **shadow})
+                atomic_write_json(self.directory / "combat_observe.json", shadow)
+                LOG.info("Combat shadow #%s: %s (observe only)",
+                         shadow["request_id"], shadow["candidate_action"].upper())
+            except Exception:
+                LOG.exception("Combat shadow failed; BG3 action already published")
         # Strict side channel: the motor action is already decided, audited and
         # published before any speech code sees the neural rates.
         if self.speech and not action.debug.get("error"):
