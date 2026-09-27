@@ -27,3 +27,30 @@ Para uma ablação pareada, use o checkpoint final e os mesmos índices de avali
 ```
 
 O `zero` mantém a simulação MaleCNS funcionando, mas zera taxas entregues ao readout. `shuffled` permuta as taxas antes do readout. São controles para verificar se qualquer resultado depende da *informação* neural. A arena D é um currículo; sucesso nela não valida C ou BG3. O resultado deste ensaio deve ser comparado com TD, controles e outras seeds antes de habilitar ataque físico.
+
+## Resultados observados — seed 42
+
+Todos os ensaios usaram o MaleCNS real, 50 passos de 20 ms por decisão, pesos sinápticos congelados, a mesma recompensa e oponente sintético D ou C. A avaliação é determinística e não atualiza o readout.
+
+| Readout / condição | Treino | Avaliação | Vitórias |
+| --- | --- | --- | ---: |
+| REINFORCE, D | 60 episódios D | D, IDs 61–70 | 6/10 |
+| TD, D | 60 episódios D | D, IDs 61–70 | 6/10 |
+| REINFORCE, taxas zeradas | checkpoint D/60 | D, IDs 61–70 | 0/10 |
+| REINFORCE, taxas embaralhadas | checkpoint D/60 | D, IDs 61–70 | 3/10 |
+| REINFORCE, sem adaptação C | checkpoint D/60 | C, IDs 61–70 | 0/10 |
+| TD, sem adaptação C | checkpoint D/60 | C, IDs 61–70 | 0/10 |
+| REINFORCE, adaptado em C | +40 episódios C | C, IDs 101–110 | 10/10 |
+| REINFORCE adaptado, taxas zeradas | checkpoint C/100 | C, IDs 101–110 | 0/10 |
+| REINFORCE adaptado, taxas embaralhadas | checkpoint C/100 | C, IDs 101–110 | 1/10 |
+
+Os readouts TD e REINFORCE escolheram **as mesmas ações em todas as dez avaliações pareadas em D**. Portanto, D não mostra superioridade de um algoritmo. Nos 40 episódios de adaptação C, o REINFORCE venceu 10; a política de treino amostra ações, enquanto a avaliação usa argmax, o que explica parte da diferença entre 10/40 em treino e 10/10 em avaliação. Isso não prova convergência estável.
+
+Para evitar comparar apenas lotes de arena diferentes, `tools/evaluate_checkpoints.py` avaliou os checkpoints REINFORCE de 60 e 100 episódios nas **mesmas** dez arenas C inéditas, IDs 1001–1010. O checkpoint anterior venceu **0/10**, o posterior **10/10**; a recompensa média foi −4,357 versus +3,929. Após adaptação, a política usou 50 `APPROACH` e 60 `BASIC_ATTACK`, contra 105 e 41 antes, e terminou em média em 11,0 turnos contra 14,6. O registro [policy_gradient_holdout.json](../experiments/policy_gradient_holdout.json) contém resultados por episódio, hashes dos checkpoints, configuração, seed e latências.
+
+```powershell
+python tools/evaluate_checkpoints.py CAMINHO_CHECKPOINT_D60 CAMINHO_CHECKPOINT_C100 --config config/combat-reinforce.toml --opponent C --seed 42 --first-episode 1001 --episodes 10 --output experiments/policy_gradient_holdout.json
+```
+
+Esta é uma observação em **uma seed** e no mesmo tipo de oponente sintético C usado para adaptação. Ainda faltam replicações com outras seeds e teste de transferência para outro tipo de adversário. Nem D nem C reproduzem economia de turnos, AP, pathfinding, habilidades ou adversários reais do BG3. Nenhuma capacidade de ataque físico foi ativada no jogo.
+As ablações posteriores do checkpoint C/100 derrubaram a avaliação de 10/10 para 0/10 com taxas zeradas e 1/10 com taxas embaralhadas, mantendo a simulação neural em execução. O resumo legível por máquina está em [policy_gradient_ablation.json](../experiments/policy_gradient_ablation.json). Isso sustenta dependência da **informação** neural dentro deste teste, sem identificar quais neurônios causam uma ação específica. Ainda faltam replicações com outras seeds e adversários.

@@ -6,6 +6,7 @@ indices; neither policy nor connectome is updated during this evaluation.
 from __future__ import annotations
 
 import argparse
+from dataclasses import asdict
 from datetime import datetime, timezone
 import hashlib
 from pathlib import Path
@@ -47,8 +48,13 @@ def evaluate(config_path: Path, checkpoints: tuple[Path, Path], *, opponent: str
         ]
         if policy.weights != before or policy.episodes != before_episodes:
             raise RuntimeError("evaluation changed readout checkpoint state")
+        resolved = checkpoint.resolve()
+        try:
+            display_path = str(resolved.relative_to(Path.cwd()))
+        except ValueError:
+            display_path = str(resolved)
         rows.append({
-            "checkpoint": str(checkpoint),
+            "checkpoint": display_path,
             "checkpoint_sha256": hashlib.sha256(checkpoint.read_bytes()).hexdigest(),
             "trained_episodes": before_episodes,
             "metrics": summarize(evaluated),
@@ -60,6 +66,11 @@ def evaluate(config_path: Path, checkpoints: tuple[Path, Path], *, opponent: str
         "schema_version": 1,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "dataset": "MaleCNS v1.0",
+        "config_file_sha256": hashlib.sha256(config_path.read_bytes()).hexdigest(),
+        "brain": {"simulation_steps": config.brain.simulation_steps,
+                  "dt": config.brain.dt, "seed": config.brain.seed},
+        "readout_algorithm": config.combat.algorithm,
+        "reward": asdict(config.reward),
         "opponent": opponent,
         "seed": seed,
         "first_episode": first_episode,
