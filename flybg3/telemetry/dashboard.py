@@ -37,7 +37,6 @@ def normalized_display_rate(hz: float, max_hz: float) -> float:
 
 def _bar(fraction: float, width: int = BAR_WIDTH) -> Text:
     filled = min(width, max(0, round(fraction * width)))
-    # ASCII survives legacy Windows cp1252 consoles and redirected PowerShell output.
     return Text.assemble(("#" * filled, "bold cyan"), ("." * (width - filled), "dim"))
 
 
@@ -139,8 +138,6 @@ def run_dashboard(directory: Path, config: TelemetryConfig, *, debug: bool = Fal
                     state = DisplayState()
                 console.print(render_snapshot(snapshot, config, state, debug=debug, speech=matched_speech))
                 last_token = token
-                # A plain print remains visible in legacy Windows consoles where
-                # Rich Live cursor updates can erase the panel but leave debug logs.
                 if once:
                     return
         time.sleep(poll_seconds)

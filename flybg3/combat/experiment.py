@@ -67,7 +67,6 @@ class RunStore:
         self.pending_checkpoint = False
 
     def event(self, event: dict) -> None:
-        # Append-only, bounded group-level event. No full voltage/spike arrays.
         with (self.root / "events.jsonl").open("a", encoding="utf-8") as out:
             out.write(json.dumps(event, allow_nan=False, separators=(",", ":")) + "\n")
 
@@ -214,7 +213,6 @@ def run_control(config: Config, name: str, seed: int, train_episodes: int, eval_
                                policy, episode_id, request_id)) if store else None)
     training, evaluation = [], []
     for i in range(episode_offset + 1, episode_offset + train_episodes + eval_episodes + 1):
-        # Every control sees the same initial arena for this seed and index.
         arena = CombatArena(seed * 100000 + i, max_turns=config.combat.max_turns,
                             opponent=opponent)
         is_train = i <= episode_offset + train_episodes
@@ -278,8 +276,6 @@ def validate_learning(config: Config, seeds: tuple[int, ...], train_episodes: in
     means = {name: {"mean_eval_win_rate": sum(r["evaluation"]["win_rate"] for r in rows) / len(rows),
                     "mean_eval_reward": sum(r["evaluation"]["mean_reward"] for r in rows) / len(rows)}
              for name, rows in by_name.items()}
-    # Small samples are never promoted to a positive learning claim. Even a
-    # larger run needs uncertainty estimates and a genuine BG3 holdout.
     conclusion = "INCONCLUSIVE"
     result = {"schema_version": 1, "generated_at": datetime.now(timezone.utc).isoformat(),
               "dataset": "MaleCNS v1.0", "seeds": seeds, "train_episodes_per_seed": train_episodes,

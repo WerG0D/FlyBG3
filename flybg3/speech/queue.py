@@ -42,8 +42,6 @@ class SpeechQueue:
             if self.stopped:
                 return False, ()
             dropped = []
-            # Directional states supersede earlier direction words, including
-            # RIGHT -> DANGER_RIGHT; only pending audio can be replaced.
             def category(intent: str) -> str:
                 return "direction" if intent in {"left", "right", "danger_left", "danger_right"} else intent
             for prior in tuple(self.pending):

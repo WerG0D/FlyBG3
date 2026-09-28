@@ -1,20 +1,18 @@
-# Ensaio de combate no BG3 — somente observação
+# BG3 combat probe: observation only
 
-O checkpoint treinado em arena C pode agora ser aplicado às **taxas neurais produzidas por uma observação real do BG3**, sem comandar ataque ou substituir o decoder de movimento. A sequência é:
+The C-trained checkpoint can be applied to neural rates produced by a real BG3 observation without issuing an attack or replacing the movement decoder.
 
 ```text
-BG3 observation.json → SensoryEncoder → MaleCNS → 14 taxas descendentes
-                                               ├→ decoder de movimento → action.json
-                                               └→ readout congelado     → combat_observe.json + log Python
+BG3 observation.json → SensoryEncoder → MaleCNS → 14 descending rates
+                                               ├→ movement decoder → action.json
+                                               └→ frozen readout    → combat_observe.json
 ```
 
-`CombatShadowProbe.inspect` recebe somente `neural_activity`, `session_id` e `request_id`. Não recebe observação, HP, distância, posição ou alvo. Seu checkpoint é carregado em avaliação determinística; não há atualização de pesos e nenhuma chamada extra ao simulador. O bridge publica `action.json` **antes** de calcular a candidata de combate. Uma falha do probe não bloqueia nem modifica a resposta existente. `combat_observe.json` contém apenas taxas, valores do readout, candidata, IDs, hash do checkpoint e latência; consumidores devem conferir `session_id` e `request_id` para rejeitar estado antigo.
+`CombatShadowProbe.inspect` accepts only `neural_activity`, `session_id`, and `request_id`. It does not receive HP, distance, position, target identity, or the raw observation. The checkpoint is deterministic and frozen. The bridge publishes `action.json` before computing the shadow candidate, so a probe failure cannot block the existing response.
 
-## Preparação
+## Run it
 
-Não é necessário reconstruir o PAK: esta etapa altera somente o bridge Python. Pare um bridge anterior que esteja usando a pasta do Script Extender, pois o lock permite um processo por vez. A configuração [combat-bg3-observe.toml](../config/combat-bg3-observe.toml) mantém o MaleCNS congelado, usa os mesmos ganhos sensoriais experimentais do treino e deixa o novo readout em `observe`. **O `physical_actions_enabled=false` do Python não controla a chave Lua do mod.**
-
-Em PowerShell, na raiz do projeto:
+No PAK rebuild is required. Stop any bridge using the Script Extender directory, then run:
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
@@ -22,13 +20,13 @@ $checkpoint = (Get-ChildItem 'runtime/lab-runs/run_manual_f8725c01/checkpoints' 
 python -m flybg3 --config config/combat-bg3-observe.toml --combat-observe-checkpoint $checkpoint
 ```
 
-O nome do run acima é o checkpoint C/100 produzido neste experimento local; se o diretório foi movido, substitua pelo caminho de um checkpoint REINFORCE válido com seed 42. Não use `--checkpoint` da arena no lugar de `--combat-observe-checkpoint`. O bridge imprime `Combat readout loaded in OBSERVE ONLY mode`, carrega os 166.700 neurônios e espera observações. O arquivo `combat_observe.json` fica em:
+Replace the example path with a valid REINFORCE checkpoint if the run directory was moved. Use `--combat-observe-checkpoint`, not the synthetic arena `--checkpoint` option. The bridge prints `Combat readout loaded in OBSERVE ONLY mode` and writes:
 
 ```text
 %LOCALAPPDATA%\Larian Studios\Baldur's Gate 3\Script Extender\FlyBG3\combat_observe.json
 ```
 
-No console **server** do BG3 Script Extender, antes de observar:
+In the BG3SE server console, keep physical actions disabled:
 
 ```text
 !flybg3_physical off
@@ -38,8 +36,10 @@ No console **server** do BG3 Script Extender, antes de observar:
 !flybg3_observe
 ```
 
-Se Flyman ainda não estiver no save, invoque `!flybg3_spawn` fora de combate e confirme o UUID/party follower antes de `!flybg3_observe`. Em combate, faça uma observação quando for o turno dele. Espere `[FlyBG3] Observation #N sent` e `[FlyBG3] Neural decision #N: ...` no console do jogo. No terminal Python, confirme `[FlyBG3] Combat shadow #N: BASIC_ATTACK (observe only)` ou outra candidata **com o mesmo N**. `BASIC_ATTACK` ainda não é enviado em `action.json`; o jogo não executará ataque por causa desse probe.
+For each request, compare `[FlyBG3] Observation #N sent`, the neural decision, and `Combat shadow #N` in the Python log. The candidate is never sent as a game action. Consumers must check both session and request IDs to reject stale state.
 
-Registre pelo menos: sem alvo visível, inimigo distante, inimigo próximo, HP alto/baixo do Flyman, três observações sucessivas do mesmo estado e mudança de alvo. Compare `candidate_action`, `features_hz`, decisão motora, request ID e contexto no log JSONL de `logs/session-*.jsonl`. A fala neural e o motor antigo podem ser deixados desligados durante este teste. Para limpar estados de experimento entre cenários, use o reset manual já documentado no README e registre a troca de sessão.
+## Suggested cases and limits
 
-**Limites:** a observação atual do jogo informa HP do Flyman, distância, ângulo e velocidade relativa do hostil visível mais próximo; não informa o HP do alvo. HP e posição só influenciam o readout por meio do encoder e da dinâmica MaleCNS. A arena C usa regras artificiais e não modela AP, alcance do Mephit, pathfinding nem turnos reais. Uma candidata coerente no log não autoriza executar `BASIC_ATTACK` fisicamente. O próximo gate é comparar decisões log-only em vários encontros reais, validar alvo/alcance/AP e só então integrar um executor de ataque separado com checagens do Script Extender.
+Record no visible target, a distant target, a nearby target, high and low Flyman HP, repeated observations, and a target change. Compare `candidate_action`, `features_hz`, motor decision, IDs, and the JSONL session record.
+
+The current observation exposes Flyman's HP and the nearest visible hostile's distance, angle, and relative speed. The target's HP is not exposed. Game values affect the readout only through the encoder and MaleCNS dynamics; the shadow decoder sees neural rates only. Synthetic arena C does not model AP, Mephit range, pathfinding, or real turn rules. A consistent candidate does not authorize `BASIC_ATTACK`. The next gate is repeated log-only evidence followed by explicit target, range, AP, and Script Extender validation.

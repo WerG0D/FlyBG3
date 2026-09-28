@@ -86,7 +86,7 @@ export default function App() {
           }
         }
         setEvents(previous => [...previous, event].slice(-MAX_EVENTS))
-      } catch { /* a broken dashboard event cannot affect the bridge */ }
+      } catch { }
     }
     return () => { active = false; window.clearInterval(retryStructure); source.close() }
   }, [])

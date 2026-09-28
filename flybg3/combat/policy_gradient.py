@@ -87,8 +87,6 @@ class PolicyGradientReadoutPolicy:
 
     def end_episode(self, *, training: bool) -> None:
         if not training:
-            # Also clears a dashboard-requested abort without learning from a
-            # truncated sequence.
             self.trajectory.clear()
             return
         if not self.trajectory:
@@ -114,8 +112,6 @@ class PolicyGradientReadoutPolicy:
             self.weights[action_index] = [max(-20.0, min(20.0, weight +
                                                 self.learning_rate * multiplier * change))
                                           for weight, change in zip(self.weights[action_index], row)]
-        # Update the action-independent baseline only after computing this
-        # episode's gradient, avoiding leakage from its own outcome.
         for t, discounted_return in enumerate(returns):
             if t == len(self.baselines):
                 self.baselines.append(0.0)

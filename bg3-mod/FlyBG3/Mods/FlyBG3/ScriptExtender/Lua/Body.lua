@@ -1,5 +1,3 @@
--- Flyman's identity is the mod-owned root template, never a player's UUID.
--- Its parent is the stock MEPHIT_Mud_A root from Shared.pak.
 FlyBG3Body = {}
 
 function FlyBG3Body.isFlyman(value)
@@ -29,8 +27,6 @@ function FlyBG3Body.attach(uuid)
         return true, "already_controlled"
     end
 
-    -- A party follower is controllable like a summon. Unlike MakePlayer,
-    -- this route is meant for a creature that is not a full companion.
     local okFollower, followerError = pcall(Osi.AddPartyFollower, uuid, hostUuid)
     if not okFollower then return false, "AddPartyFollower_failed: " .. tostring(followerError) end
     return true, "requested"

@@ -1,60 +1,45 @@
-# FlyBG3 0.1
+# FlyBG3
 
-NPC de Baldur's Gate 3 controlado por uma simulação neural spiking cuja conectividade deriva do connectome MaleCNS v1.0 de *Drosophila melanogaster*.
+> A Baldur's Gate 3 NPC driven by a spiking neural simulation whose connectivity is derived from the MaleCNS v1.0 connectome of *Drosophila melanogaster*.
 
-## Combat Learning Lab (experimental)
+[![Python](https://img.shields.io/badge/python-3.11--3.13-3776AB?logo=python&logoColor=white)](https://www.python.org/) [![Status](https://img.shields.io/badge/status-experimental-f0b35b)](#status)
 
-Foi acrescentado um laboratório **sintético** de combate 1v1 que reutiliza o MaleCNS real e treina somente um readout linear de suas taxas descendentes. O cérebro e seus pesos permanecem congelados. A arena executa a ação escolhida, mede dano/resultado, calcula recompensa e atualiza a política após obter a janela neural seguinte. O painel web é um observador separado. **Esta versão do laboratório ainda não ataca no BG3 real**, não instala um adaptador de combate e não altera o TTS/movimento já validado no jogo.
-
-```text
-Terminal 1: python -m flybg3 dashboard --config config/combat-lab.toml
-Terminal 2: python -m flybg3 arena --config config/combat-lab.toml --mode train --policy trainable --episodes 10
-Browser:    http://127.0.0.1:8765
-```
-
-Antes do primeiro uso do painel, construa o frontend com `.\scripts\dashboard_build.ps1` (Node.js/npm). Em `EVAL`, `--mode eval --policy frozen` executa a arena sem explorar nem atualizar pesos. Uma comparação reproduzível usa `python -m flybg3 validate-learning --config config/combat-lab.toml --train-episodes 3 --eval-episodes 3 --seeds 42 43 44` e grava [learning_validation.json](experiments/learning_validation.json). Os arquivos completos por run ficam em `runtime/lab-runs/`; `dashboard/public/connectome.json` contém uma amostra real das coordenadas e conexões do MaleCNS. Refaça-a com `python -m flybg3 export-connectome` se trocar o dataset.
-
-Leia [COMBAT_LEARNING.md](docs/COMBAT_LEARNING.md), [LEARNING_RESEARCH.md](docs/LEARNING_RESEARCH.md), [REWARD_DESIGN.md](docs/REWARD_DESIGN.md) e [DASHBOARD.md](docs/DASHBOARD.md) para fórmulas, limites e controles. Uma melhoria no simulador **não** é evidência automática de aprendizado em BG3.
-
-Uma segunda política experimental usa retorno do episódio inteiro para atribuir crédito a ações anteriores. A fórmula, configuração e ablações estão em [POLICY_GRADIENT.md](docs/POLICY_GRADIENT.md). O algoritmo TD anterior continua selecionável por `config/combat-lab.toml`; ambos usam o mesmo MaleCNS congelado.
-
-O próximo teste **no BG3 real é somente observação**: [BG3_COMBAT_OBSERVE.md](docs/BG3_COMBAT_OBSERVE.md) mostra como carregar o checkpoint C/100 no bridge, desativar ações físicas no console do jogo e comparar `Combat shadow #N` com a observação #N. O readout de combate escreve `combat_observe.json`; ataques ainda não são enviados ao jogo.
-
-**Estado do treino:** os primeiros ensaios em A/C/D não demonstraram transferência; consulte [LEARNING_VALIDATION.md](docs/LEARNING_VALIDATION.md) e [continuation.json](experiments/continuation.json). No ensaio mais recente, TD e REINFORCE fizeram 6/10 em D com as mesmas ações, e ambos fizeram 0/10 ao transferir para C. Após 40 episódios adicionais de REINFORCE em C, o checkpoint adaptado fez 10/10 contra 0/10 do anterior num holdout pareado de arenas C inéditas. Veja [POLICY_GRADIENT.md](docs/POLICY_GRADIENT.md) e [policy_gradient_holdout.json](experiments/policy_gradient_holdout.json). É um resultado sintético de uma seed, não valida ataque no BG3. Para continuar o readout sem alterar o MaleCNS, use `python -m flybg3 arena --config config/combat-reinforce.toml --mode train --policy trainable --opponent C --episodes 40 --eval-episodes 10 --checkpoint CAMINHO_DO_CHECKPOINT`.
-
-O marco atual executa **movimento físico derivado da atividade neural**:
+FlyBG3 keeps the game and the neural process separate. BG3 Script Extender writes an observation, the Python bridge encodes it as an abstract sensory stimulus, runs the frozen MaleCNS network, and returns an action. The game remains responsible for validating turn state and executing the result.
 
 ```text
-BG3 + Script Extender (Lua, server-side)
-       │ observation.json
-       ▼
-Python FlyBG3 Bridge
-       │ encoder abstrato: LC4/LPLC2/LPLC1/LC10a
-       ▼
-flybrain 0.1.0 — MaleCNS congelado
-       │ spikes de descending neurons
-       ▼
-decoder neural
-       │ action.json
-       ▼
-BG3SE valida turno e caminho
-       │ CharacterMoveToPosition
-       ▼
-Flyman move no mundo do jogo
+BG3.exe
+   │ Lua server-side / BG3 Script Extender
+   ▼
+observation.json ──► Python bridge ──► sensory encoder
+                                      │
+                                      ▼
+                         flybrain / MaleCNS v1.0
+                                      │ descending spikes and rates
+                                      ├──► MotorDecoder ──► action.json ──► BG3
+                                      └──► SpeechDecoder ─► optional TTS
 ```
 
-O decoder recebe somente taxas de disparo de DNa02, DNp01, DNg100 e MDN. Ele não recebe posição, distância, direção ou velocidade do mundo. A observação só volta a ser usada depois da decisão, no adaptador físico que converte `TURN_LEFT`, `TURN_RIGHT`, `APPROACH` ou `RETREAT` em um destino curto e navegável.
+## Status
 
-## Requisitos
+The real neural pipeline, atomic file bridge, telemetry, speech side channel, and experimental lateral movement have been exercised in a real save. The synthetic combat lab trains only an external linear readout; MaleCNS weights remain frozen.
 
-* Windows 10/11.
-* Python 3.11–3.13. O desenvolvimento foi validado com Python 3.12; o Python 3.14 presente nesta máquina não foi usado porque a pilha científica/Numba deve ser instalada numa versão suportada.
-* Baldur's Gate 3 e [BG3 Script Extender](https://github.com/Norbyte/bg3se), API v30 ou superior.
-* Para empacotar o mod: [LSLib/Divine.exe](https://github.com/Norbyte/lslib).
+| Component | Status |
+| --- | --- |
+| MaleCNS v1.0 through `flybrain` | Validated: 166,700 neurons, 25,582,938 aggregated connections, 1,314 descending neurons |
+| BG3 observation to abstract stimulus | Implemented |
+| Motor decoder | `IDLE`, `TURN_LEFT`, `TURN_RIGHT`, `APPROACH`, `RETREAT` |
+| Atomic bridge and heartbeats | Implemented |
+| Physical test movement | Validated for lateral steps with BG3SE v32 |
+| SpeechDecoder and Windows TTS | Optional, asynchronous, validated |
+| Combat Learning Lab | Synthetic only; MaleCNS frozen |
+| BG3 combat shadow probe | Implemented in observation-only mode |
+| Physical Mud Mephit attack | Not integrated |
 
-## Instalação Python e connectome
+Synthetic arena results are not evidence of learned combat in BG3. The latest REINFORCE run reached 10/10 on the adapted C holdout while the previous checkpoint reached 0/10. See [POLICY_GRADIENT.md](docs/POLICY_GRADIENT.md), [LEARNING_VALIDATION.md](docs/LEARNING_VALIDATION.md), and [BG3_COMBAT_OBSERVE.md](docs/BG3_COMBAT_OBSERVE.md).
 
-No PowerShell, a partir da raiz do repositório:
+## Installation
+
+Requirements: Windows 10/11, Python 3.11–3.13 (3.12 is recommended), [BG3 Script Extender](https://github.com/Norbyte/bg3se), [LSLib/Divine](https://github.com/Norbyte/lslib) for mod packaging, and Node.js/npm for the dashboard build.
 
 ```powershell
 py -3.12 -m venv .venv
@@ -64,171 +49,132 @@ python -m flybrain download
 python tools\inspect_brain.py --verify-hashes --output docs\brain-inspection.json
 ```
 
-O download oficial grava aproximadamente 258 MB em `%USERPROFILE%\fly-data` por padrão. Defina `FLY_DATA` antes do download para outro local. A inspeção deve informar 166.700 neurônios, 25.582.938 conexões agregadas e 1.314 descending neurons.
+The official download uses `%USERPROFILE%\fly-data` by default. Set `FLY_DATA` to choose another directory. `device = "auto"` selects CUDA only when a compatible CuPy device is available.
 
-GPU é opcional e somente para NVIDIA/CUDA 12 conforme o extra oficial:
-
-```powershell
-python -m pip install -e ".[test,gpu]"
-```
-
-`device = "auto"` só escolhe CUDA quando CuPy realmente detecta um dispositivo; caso contrário usa CPU/Numba.
-
-## Experimentos reproduzíveis
+## Run the synthetic pipeline
 
 ```powershell
 python tools\fake_bg3.py --experiment
-```
-
-O comando executa 90 janelas neurais reais: 14 cenários, cinco seeds fixas (`42..46`) e fases temporais adicionais. Ele recria:
-
-* [results.json](experiments/results.json), com estímulos, spikes, taxas, decisão, latência e estado residual por execução;
-* [EXPERIMENTS.md](docs/EXPERIMENTS.md), com a matriz agregada e interpretação cautelosa.
-
-Para um cenário interativo simples com o connectome real:
-
-```powershell
 python tools\fake_bg3.py --scenario left
 ```
 
-## Monitor neural em tempo real
-
-O bridge publica um snapshot compacto e atômico em `telemetry.json` após cada decisão. Em um **segundo** terminal, enquanto `python -m flybg3` roda no primeiro:
-
-```powershell
-python -m flybg3 telemetry
-python -m flybg3 telemetry --debug
-```
-
-`--debug` mostra DNs individuais e os dados de percepção (heading, ângulo, distância e velocidade). Para validar o monitor sem abrir BG3, rode `python tools\fake_bg3.py --scenario all`; os quatro cenários isolados mostram steering esquerdo/direito, looming e silêncio. Para o bridge de arquivos, use `--bridge-dir runtime\fake` no fake e `python -m flybg3 telemetry --directory runtime\fake` no monitor.
-
-A telemetria observa os spikes de steps já executados. O decoder não recebe nenhum valor do monitor. O teste com MaleCNS real confirmou que ligá-la não muda spikes, voltagens, scores nem ação. Consulte [NEURAL_TELEMETRY.md](docs/NEURAL_TELEMETRY.md) para grupos, fórmula, limites científicos e medição do overhead. Movimento físico não é ligado pelo monitor; para testar somente logs no BG3, use `!flybg3_physical off`.
-
-## Fala neural opcional
-
-O `SpeechDecoder` lê somente as taxas neurais descendentes já calculadas e produz frases curtas por templates, em paralelo à ação motora. O TTS local do Windows roda em uma fila assíncrona; falhas de voz não alteram o cérebro nem `action.json`. A fala vem **desativada** por padrão.
-
-```powershell
-python -m flybg3 speech-test  # testa a voz local, sem carregar MaleCNS
-python -m flybg3 --config config\default.toml --speech
-python -m flybg3 telemetry --debug  # em outro terminal; mostra intenção e texto
-```
-
-Mantenha **um único bridge**: encerre uma instância anterior antes de iniciar com `--speech`. Para testar sem som, use `provider = "null"` em uma cópia local do TOML. O bridge grava `speech.json` junto de `action.json`; o JSONL da sessão registra enqueue e conclusão. `!flybg3_physical off` é opcional para testar voz sem deslocamento e não é exigido pelo TTS. O mapeamento, limiares, fórmulas, resultados e limites científicos estão em [NEURAL_SPEECH.md](docs/NEURAL_SPEECH.md).
-
-## Bridge de arquivos sem BG3
-
-Terminal 1:
+The experiment updates [experiments/results.json](experiments/results.json) and [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md). To exercise the file bridge in two terminals:
 
 ```powershell
 python -m flybg3 --directory runtime\fake --once
-```
-
-Terminal 2:
-
-```powershell
 python tools\fake_bg3.py --bridge-dir runtime\fake --scenario left
 ```
 
-Isso comprova `observation.json → FlyBrain → action.json`, incluindo session UUID, request ID monotônico, journal persistente contra duplicatas, heartbeat lease e replace atômico no lado Python.
+This verifies `observation.json → FlyBrain → action.json`, monotonic request IDs, heartbeats, duplicate protection, and atomic writes.
 
-## Empacotar e instalar o mod
-
-Instale primeiro o Script Extender pelo procedimento oficial. Depois:
+## Combat lab and dashboard
 
 ```powershell
-.\scripts\build_mod.ps1 -DivineExe "C:\caminho\LSLib\Packed\Tools\Divine.exe"
-.\scripts\install_mod.ps1
+.\scripts\dashboard_build.ps1
+python -m flybg3 dashboard --config config\combat-lab.toml
+python -m flybg3 arena --config config\combat-lab.toml --mode train --policy trainable --episodes 10
 ```
 
-O instalador copia somente `build\FlyBG3.pak` para `%LOCALAPPDATA%\Larian Studios\Baldur's Gate 3\Mods`. Ele não sobrescreve um pacote existente sem `-Force` e não edita `modsettings.lsx`. Ative FlyBG3 no BG3 Mod Manager ou no gerenciador de mods do jogo.
+Open <http://127.0.0.1:8765>. The dashboard is read-only with respect to decisions: it does not select actions, inject stimuli, or alter the connectome.
 
-## Executar no BG3
+```powershell
+python -m flybg3 arena --config config\combat-lab.toml --mode eval --policy frozen --episodes 10
+python -m flybg3 validate-learning --config config\combat-lab.toml --train-episodes 3 --eval-episodes 3 --seeds 42 43 44
+```
 
-1. Inicie o bridge antes de carregar o save:
+Read [COMBAT_LEARNING.md](docs/COMBAT_LEARNING.md), [REWARD_DESIGN.md](docs/REWARD_DESIGN.md), and [DASHBOARD.md](docs/DASHBOARD.md) before interpreting results.
 
-   ```powershell
-   .\.venv\Scripts\Activate.ps1
-   python -m flybg3 --config config\default.toml
-   ```
+## Telemetry and neural speech
 
-   Para iniciar pelo launcher PowerShell com logs detalhados, use `.\scripts\run_bridge.ps1 -VerboseLogging` (o nome evita conflito com o parâmetro comum `-Debug` do PowerShell).
+```powershell
+python -m flybg3 telemetry --debug
+python -m flybg3 speech-test
+python -m flybg3 --config config\default.toml --speech
+```
 
-2. Abra BG3, carregue um save e use o console server-side do Script Extender.
-3. Fora de combate, crie ou recupere o corpo próprio do Flyman: `!flybg3_spawn`. O mod usa um novo template herdado de `MEPHIT_Mud_A`, com visual de Mud Mephit, e solicita `AddPartyFollower` para vinculá-lo ao avatar host como seguidor controlável. O seu avatar não é alterado.
-4. O console deve mostrar `Flyman Mud Mephit spawned and bound: <UUID real do save>`. Anote esse UUID se tiver definido `FLYBG3_NPC_UUID` ou `[bridge].npc_uuid`: atualize o filtro ou deixe-o vazio.
-5. Fora de combate, dispare uma observação manual com `!flybg3_observe`. Em combate, `TurnStarted` dispara automaticamente para o corpo do Flyman.
+`SpeechDecoder` receives neural firing rates only and feeds deterministic templates through an asynchronous local TTS queue. Speech is disabled by default. Set `provider = "null"` to test without audio. Speech never calls `brain.step()`, injects stimuli, or changes `action.json`. See [NEURAL_SPEECH.md](docs/NEURAL_SPEECH.md) and [NEURAL_TELEMETRY.md](docs/NEURAL_TELEMETRY.md).
 
-O bridge Python precisa permanecer em execução enquanto BG3 envia observações. Use `!flybg3_status` para conferir `brain=ready` e a idade do heartbeat antes do teste. Se aparecer `brain=offline`, inicie `python -m flybg3 --config config\default.toml` e tente uma nova observação; respostas antigas nunca são reutilizadas.
+## Baldur's Gate 3 integration
 
-Saída esperada no console:
+Start the bridge before loading a save:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+python -m flybg3 --config config\default.toml
+```
+
+In the BG3SE server console:
+
+```text
+!flybg3_spawn
+!flybg3_status
+!flybg3_observe
+```
+
+The mod creates or recovers Flyman, a mod-owned Mud Mephit template, and adds it as a party follower. The game supplies the real instance UUID; no save UUID is hardcoded. Use `FLYBG3_NPC_UUID` or `[bridge].npc_uuid` to restrict the bridge to one instance.
+
+Communication files normally live under `%LOCALAPPDATA%\Larian Studios\Baldur's Gate 3\Script Extender\FlyBG3\`:
+
+```text
+observation.json  action.json  telemetry.json  speech.json
+heartbeat_bg3.json  heartbeat_brain.json  requests.sqlite3
+```
+
+Expected log-only output:
 
 ```text
 [FlyBG3] Observation #1 sent
-[FlyBG3] Neural decision #1: TURN_LEFT
-[FlyBG3] Physical action #1: TURN_LEFT (issued)
+[FlyBG3] Neural decision #1: TURN_RIGHT
 ```
 
-Arquivos de comunicação no Windows:
-
-```text
-%LOCALAPPDATA%\Larian Studios\Baldur's Gate 3\Script Extender\FlyBG3\
-  observation.json
-  action.json
-  telemetry.json
-  speech.json # somente quando a fala opcional está ativa
-  heartbeat_bg3.json
-  heartbeat_brain.json
-  requests.sqlite3
-```
-
-O UUID da instância criada fica em `settings.json` nesse diretório. O mod só aceita esse UUID se `GetTemplate` confirmar o template próprio do Flyman. Um vínculo antigo ao seu avatar é descartado ao carregar a sessão. `!flybg3_spawn` reutiliza o Flyman já presente no nível; `!flybg3_bind UUID` serve apenas para recuperar manualmente uma instância que tenha esse template. `FLYBG3_NPC_UUID` ou `[bridge].npc_uuid` pode restringir o bridge ao mesmo corpo, mas o valor anterior do seu personagem deve ser removido. Nenhum UUID de instância é inventado no código.
-
-### Recurso Mud Mephit e BG3 Toolkit
-
-O template de Flyman herda o `MEPHIT_Mud_A` extraído do `Shared.pak` instalado; usa seus recursos visuais, animações e stats, e recebe nome localizado próprio. `scripts/build_mod.ps1` compila o root template para `_merged.lsf` e a tradução para `.loca` usando LSLib antes de empacotar. O BG3 Toolkit e o **BG3 Toolkit Data** estão instalados nesta máquina. Foi criado também o projeto separado [`FlyBG3Arena`](docs/TOOLKIT_ARENA.md) no Toolkit: um campo de testes em `Basic_Level_A` com quatro marcadores, um goblin, um mephit e dois dragões. A composição inicial foi validada em Game Mode; a edição recente foi empacotada e instalada, mas ainda não foi verificada no jogo. Para futuras edições, use `scripts/update_arena.ps1` conforme o guia da arena. O Toolkit oficial está em `USER MODE`, por isso ainda não há paredes nem nível novo.
-
-O usuário confirmou que o corpo Mud Mephit foi criado no save e que `AddPartyFollower` retornou `follower=1` e deu turno ao Flyman. A tentativa inicial com `MakePlayer` não produziu controle de jogador. Faça um save separado antes de `!flybg3_spawn`, pois a criatura é persistente e um seguidor costuma aparecer junto ao retrato do líder. Repetir o comando tenta anexar a criatura existente, sem duplicá-la. A decisão neural no novo corpo ainda precisa de teste com o bridge Python ligado. Consulte [a nota de implementação](docs/MUD_MEPHIT.md) para os comandos e limites do teste.
-
-## Primeiro movimento físico
-
-O pacote atual pode emitir um movimento lateral pequeno ou um passo de aproximação/fuga. O executor só aceita uma resposta com o mesmo `session_id` e `request_id`, revalida que o personagem ainda pode agir e exige um hostil visível ou dano recente. `TURN_LEFT` e `TURN_RIGHT` significam um `lateral_step` de 2 m; não são uma rotação arbitrária, porque o Script Extender não expõe uma chamada Lua documentada para definir yaw.
-
-O caminho físico valida primeiro o destino com `Ext.Level.BeginPathfindingImmediate`/`FindPath`/`ReleasePath` e só então usa `Osi.CharacterMoveToPosition`, APIs confirmadas na documentação e em um mod server-side real. Essa chamada pode ignorar AP/turno em combate e pode cair para teleporte quando o destino está bloqueado, por isso `AllowCombatMovement = false` permanece como padrão. O movimento foi comprovado em BG3SE v32 tanto para `TURN_RIGHT` quanto para `TURN_LEFT`; o teste em combate usou a opção experimental abaixo. A limitação e as fontes estão em [RESEARCH.md](docs/RESEARCH.md#movimento-e-combate-diferença-importante).
-
-Comandos de controle no console server-side:
+Physical movement is opt-in:
 
 ```text
 !flybg3_physical on
-!flybg3_physical off
-!flybg3_combat_move on   # experimental; bypassa AP/turno
-!flybg3_combat_move off
-!flybg3_auto_end on      # encerra após IDLE ou depois do evento de chegada
-!flybg3_auto_end off
-!flybg3_status           # corpo, party follower, imortalidade e heartbeat do bridge
-!flybg3_immortal on      # imortalidade apenas para o template Flyman
-!flybg3_immortal off
+!flybg3_combat_move on
 ```
 
-`ImmortalForTesting = true` habilita `SetImmortal` no Flyman ao carregar o save. A opção é destinada a testes e não revive uma criatura já morta. `!flybg3_immortal off` reverte durante a sessão; ao recarregar o mod, o padrão volta a ser aplicado.
+`!flybg3_combat_move on` can bypass AP/turn economy and is intended only for test saves. The next game milestone remains observation-only: compare the trained readout with real telemetry before evaluating a physical attack.
 
-Se uma decisão neural for produzida sem alvo/dano atual, o console registra `Physical action skipped` e o personagem permanece parado. Isso preserva a atividade espontânea do connectome para o experimento sem transformar tonicidade em movimento inesperado.
+Package the mod with:
 
-O encerramento automático fica desativado por padrão. Quando habilitado, uma decisão neural `IDLE` encerra o turno imediatamente. Para movimento, `CharacterMoveToPosition` recebe um evento único vinculado ao `request_id`, e somente o `EntityEvent` de chegada correspondente pode chamar `EndTurn`. Cancelamento e timeout são registrados e não encerram o turno à força.
+```powershell
+.\scripts\build_mod.ps1 -DivineExe "C:\path\to\LSLib\Packed\Tools\Divine.exe"
+.\scripts\install_mod.ps1
+```
 
-## Testes
+The Toolkit arena workflow is documented in [TOOLKIT_ARENA.md](docs/TOOLKIT_ARENA.md). The API evidence and known limitations are collected in [RESEARCH.md](docs/RESEARCH.md).
+
+## Science and limitations
+
+This is a spiking neural simulation whose connectivity is derived from a real connectome. It is not a complete biological fly: the model uses point-neuron LIF dynamics and abstract sensory detectors, without detailed dendrites, full neuromodulation, biological plasticity, or evidence of consciousness.
+
+The connectome remains frozen. When learning is enabled, only an external linear readout is updated from neural rates and synthetic arena rewards. The motor decoder receives neural activity rather than raw position, distance, direction, or HP. The encoder is the boundary where game observations become stimuli.
+
+## Tests
 
 ```powershell
 python -m pytest -q
 python -m pytest -q -m brain
+npm --prefix dashboard run build
+git diff --check
 ```
 
-O primeiro conjunto não exige download do cérebro. O segundo carrega o MaleCNS real, verifica causalidade, continuidade de estado e a ablação de propagação sináptica. Os arquivos Lua são parseados com Lua 5.4; os testes também verificam os gates do executor, o `vec3` posicional do pathfinder e o proxy chamável das funções Osiris.
+Basic tests do not require the dataset. `brain` tests load MaleCNS and verify counts, temporal continuity, stimulus causality, and the absence of a sensory bypass. A real BG3 state requires the manual procedure in [BG3_COMBAT_OBSERVE.md](docs/BG3_COMBAT_OBSERVE.md).
 
-## Evidência e limitações
+## Roadmap
 
-As APIs, commits consultados, grupos neuronais e pesquisas funcionais estão em [RESEARCH.md](docs/RESEARCH.md). Os números do conectoma e hashes estão em [brain-inspection.json](docs/brain-inspection.json).
+The detailed roadmap is [ROADMAP.md](docs/ROADMAP.md):
 
-O conectoma fornece conectividade derivada de microscopia eletrônica. O modelo LIF usa neurônios pontuais e parâmetros calibrados pelo projeto `fly.ai`; não modela dendritos detalhados, neurônios graduados, neuromodulação, plasticidade ou toda a fisiologia da mosca. Os estímulos visuais são detectores abstratos. Este projeto não demonstra consciência e não deve ser descrito como uma mosca literal jogando BG3.
+1. repeat the observation-only BG3 probe and publish real observations;
+2. measure the readout on controlled saves with target, range, and turn context;
+3. validate target, range, AP, and preconditions before any physical attack;
+4. add a Mud Mephit attack behind an explicit configuration gate;
+5. record real episodes and replays while keeping MaleCNS frozen;
+6. support independent NPC brains, multiple targets, and neural replay.
 
-O pipeline e o movimento físico foram validados num save real. Ataque básico e encerramento automático de turno ainda não fazem parte deste milestone. `UseSpell` não será tratado como ataque normal porque a API Osiris documentada ignora pré-condições de acesso e recursos; qualquer integração de combate completa deve preservar essa limitação ou usar um mecanismo de ação do jogo que respeite a economia do turno.
+## Contributing and licensing
+
+Read [CONTRIBUTING.md](../CONTRIBUTING.md), [SCIENCE.md](../SCIENCE.md), and [PROTOCOL.md](../PROTOCOL.md) when those project guides are added. Changes to stimuli, readout groups, or rewards should include a reproducible experiment and identify whether evidence is synthetic or from BG3.
+
+This repository does not yet declare a redistribution license. Do not assume that code, connectome data, or BG3 resources may be redistributed without checking their respective licenses.

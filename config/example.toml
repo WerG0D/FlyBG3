@@ -1,6 +1,4 @@
-# Copy to config/local.toml; omitted parameters retain defaults.
 [bridge]
-# For offline filesystem tests; omit for the real Script Extender path.
 directory = "runtime/fake"
 npc_uuid = "" # optional: use UUID printed by !flybg3_spawn, never the old avatar UUID
 log_directory = "logs"

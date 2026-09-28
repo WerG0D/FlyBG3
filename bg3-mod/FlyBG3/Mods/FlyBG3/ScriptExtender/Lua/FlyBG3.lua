@@ -74,7 +74,6 @@ local function poll(session, rid)
         FlyBG3.pending = nil
         return
     end
-    -- Deadline checked BEFORE file, so a late response can never move an actor.
     if Ext.Timer.MonotonicTime() >= p.deadline then
         FlyBG3.pending = nil
         local heartbeat = read("heartbeat_brain.json")

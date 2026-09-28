@@ -1,12 +1,9 @@
-# Real-game shadow test. The existing motor decoder still owns action.json.
-# The combat readout only writes combat_observe.json and a Python log entry.
 [brain]
 simulation_steps = 50
 dt = 0.02
 seed = 42
 
 [encoder]
-# Same experimental sensory gains as the synthetic combat training runs.
 proximity_gain = 0.6
 health_stress_gain = 0.4
 

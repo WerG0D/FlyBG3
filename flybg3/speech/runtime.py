@@ -74,8 +74,6 @@ class SpeechRuntime:
                                "verbalization_ms": (verbalized-decoded)*1000,
                                "queue_enqueue_ms": 0.0}}
         dropped = ()
-        # Hold the file lock through enqueue and publication: even a fast Null
-        # worker must wait before updating the initial snapshot or session log.
         with self.file_lock:
             if should_queue:
                 enqueue_start = time.perf_counter()

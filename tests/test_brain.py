@@ -27,8 +27,6 @@ def test_real_connectome_causal_input_and_state(observation):
 def test_decoder_has_no_sensory_bypass(observation):
     config = Config()
     sim = Simulation(config)
-    # Ablation: preserve every sensory injection but remove synaptic propagation.
-    # Test-only intervention; production never mutates connectome weights.
     import numpy as np
     sim.brain.brain.synaptic_input = lambda fired: sim.brain.brain.xp.zeros((sim.brain.brain.n, 1), np.float32)
     observation["nearest_hostile"].update(relative_angle=-90., closing_speed=8., distance=3.)

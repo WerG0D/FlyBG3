@@ -1,9 +1,3 @@
--- Physical-action milestone.
---
--- The decoder still receives only descending-neuron activity. This module
--- consumes the already-decoded action and the matching observation solely to
--- turn a neural command into a small, bounded movement request. It never
--- chooses an action from position, distance, direction, or speed.
 ActionExecutor = {pending=nil}
 
 local function number(value, fallback)
@@ -56,8 +50,6 @@ local function currentGate(uuid, observation)
         return false, "out_of_combat_movement_disabled" end
     if Osi.IsInteractionDisabled(uuid) == 1 then return false, "interaction_disabled" end
     if Osi.IsDead(uuid) == 1 or (Osi.GetHitpoints(uuid) or 0) <= 0 then return false, "dead_or_down" end
-    -- Re-check the live engine state after the Python round trip. The
-    -- observation is not trusted to authorize a stale movement request.
     if Osi.IsInCombat(uuid) == 1 and not FlyBG3Config.AllowCombatMovement then
         return false, "combat_started_during_round_trip" end
     return true
@@ -69,9 +61,6 @@ local function reachable(uuid, point)
     end
     local entity = Ext.Entity.Get(uuid)
     if not entity then return false, "entity_unavailable" end
-    -- glm::vec3 is marshalled by BG3SE from a positional Lua table. A keyed
-    -- {x=..., y=..., z=...} table is convenient internally, but is not a vec3
-    -- at the native boundary and makes request creation fail.
     local target = {point.x, point.y, point.z}
     local started, path = pcall(Ext.Level.BeginPathfindingImmediate, entity, target)
     if not started then
@@ -140,9 +129,6 @@ function ActionExecutor.execute(action, observation)
     if not point then return false, pointReason end
     local pathOk, pathReason = reachable(uuid, point)
     if not pathOk then return false, pathReason end
-    -- Osiris names are BG3SE LightCppValue callable proxies, not ordinary Lua
-    -- functions. Calling through pcall both supports that proxy and reports a
-    -- useful error if this name/arity is absent in the loaded game build.
     local event, moveId, requestId = movementIdentity(action)
     local completion = {uuid=uuid, event=event, move_id=moveId,
         request_id=requestId, action=actionName}

@@ -46,8 +46,6 @@ class TrainableNeuralReadoutPolicy:
         self.rng = random.Random(seed)
         self.learning_rate, self.discount = learning_rate, discount
         self.epsilon, self.epsilon_decay, self.epsilon_floor = epsilon, epsilon_decay, epsilon_floor
-        # Small seeded weights break deterministic tie bias without introducing
-        # an explicit world-state heuristic or a special attack preference.
         self.weights = [[self.rng.uniform(-0.01, 0.01) for _ in range(WIDTH)] for _ in ACTIONS]
         self.updates = 0
         self.episodes = 0
@@ -100,8 +98,6 @@ class TrainableNeuralReadoutPolicy:
                 or tuple(data.get("feature_names", ())) != FEATURE_NAMES
                 or data.get("actions") != [a.value for a in ACTIONS]):
             raise ValueError("incompatible policy checkpoint")
-        # Early v1 checkpoints stored weights/epsilon but omitted optimizer/RNG
-        # fields. They remain usable for frozen EVAL; new saves include all fields.
         policy = cls(seed=data["seed"], learning_rate=data.get("learning_rate", 0.05),
                      discount=data.get("discount", 0.9), epsilon=data["epsilon"],
                      epsilon_decay=data.get("epsilon_decay", 0.995),

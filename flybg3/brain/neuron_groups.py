@@ -1,15 +1,13 @@
 """Type names verified against brain-v1 MaleCNS metadata, not inferred aliases."""
 SENSORY_TYPES = ("LC4", "LPLC2", "LPLC1", "LC10a")
 MOTOR_TYPES = ("DNa02", "DNp01", "DNg100", "MDN")
-# Read-only experimental probes. These exact MaleCNS v1.0 type names were
-# checked in brain.npz; none participates in the production decoder.
 CANDIDATE_DESCENDING_TYPES = (
-    "DNa01", "DNb02", "DNg13",       # steering / walking
-    "DNa03", "DNa11", "aSP22",       # social pursuit / steering candidates
-    "DNp09", "DNp26",                # forward locomotion / pursuit candidates
-    "DNp02", "DNp10", "DNp11",      # jump / escape candidates
-    "pIP10", "pMP2",                  # courtship song outputs; comparison only
-    "DNg103",                          # exploratory halt-related candidate
+    "DNa01", "DNb02", "DNg13",
+    "DNa03", "DNa11", "aSP22",
+    "DNp09", "DNp26",
+    "DNp02", "DNp10", "DNp11",
+    "pIP10", "pMP2",
+    "DNg103",
 )
 
 

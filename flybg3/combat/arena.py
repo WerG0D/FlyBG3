@@ -76,8 +76,6 @@ class CombatArena:
         killed = s.enemy_hp <= 0
         if not killed:
             if self.opponent in {"C", "D"}:
-                # Kiting opponent: repeated out-of-range attacks never close
-                # the gap; a useful policy must switch between approach/attack.
                 s.flyman_hp = max(0, s.flyman_hp - (1 if self.opponent == "D"
                                                    else self.rng.randint(1, 2)))
                 if s.distance > 1.5:

@@ -13,7 +13,6 @@ class SpeechDecoder:
         self.config = config
 
     def decode(self, request_id: int, rates_hz: Mapping[str, float]) -> NeuralSpeechState:
-        # The named rates already exist in FlyBrainAdapter's motor window.
         names = ("DNa02_L", "DNa02_R", "DNp01_L", "DNp01_R",
                  "DNg100_L", "DNg100_R", "MDN_L", "MDN_R")
         values = {}

@@ -32,7 +32,7 @@ def test_bus_latest_state_and_critical_backpressure():
     bus.publish(event("reward", 4))
     bus.publish(event("episode_end", 5))
     bus.publish(event("reward", 6))
-    assert client not in bus.clients  # slow client detached; durable JSONL keeps rewards
+    assert client not in bus.clients
     new = bus.subscribe()
     assert new.get_nowait()["request_id"] == 3
     bus.reset_run()

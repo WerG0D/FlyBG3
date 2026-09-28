@@ -25,8 +25,6 @@ class MotorDecoder:
 
     def decode(self, rates: dict[str, float]) -> Decision:
         c = self.config
-        # Rates are mean spikes / neuron / simulated second, so group size
-        # does not give a larger group an automatic advantage.
         left, right = rates["DNa02_L"], rates["DNa02_R"]
         forward = (rates["DNg100_L"] + rates["DNg100_R"]) / 2
         backward = (rates["MDN_L"] + rates["MDN_R"]) / 2
@@ -39,7 +37,6 @@ class MotorDecoder:
         winner = max(scores, key=scores.get)
         action = ActionType(winner) if scores[winner] >= c.minimum_activity else ActionType.IDLE
         old_score = scores.get(self.previous.value, 0.0)
-        # Hysteresis cannot sustain an action without ongoing neural activity.
         if action != self.previous and old_score >= c.minimum_activity:
             if self.age < c.minimum_action_decisions or scores[winner] < old_score + c.hysteresis:
                 action = self.previous

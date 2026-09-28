@@ -34,7 +34,7 @@ def test_delayed_reward_reaches_earlier_neural_action():
     before = [row[:] for row in policy.weights]
     policy.observe_transition(far, CombatAction.APPROACH, 0.0, close, training=True)
     policy.observe_transition(close, CombatAction.BASIC_ATTACK, 4.0, None, training=True)
-    assert policy.weights == before  # No update until the measured terminal outcome.
+    assert policy.weights == before
     policy.end_episode(training=True)
     feature = 1 + FEATURE_NAMES.index("DNp01_L")
     assert policy.weights[ACTIONS.index(CombatAction.APPROACH)][feature] > 0
@@ -54,7 +54,7 @@ def test_negative_return_and_baseline_are_episode_boundaries():
     before = [row[:] for row in policy.weights]
     policy.observe_transition(features, CombatAction.IDLE, -4.0, None, training=True)
     policy.end_episode(training=True)
-    assert policy.weights == before  # Exact previous return -> zero advantage.
+    assert policy.weights == before
     policy.observe_transition(features, CombatAction.IDLE, 10.0, None, training=False)
     policy.end_episode(training=False)
     assert policy.weights == before and policy.episodes == 2

@@ -13,8 +13,6 @@ def test_atomic_readers_never_see_partial(tmp_path):
     def reader():
         while not stop.is_set():
             data = read_json(path)
-            # Windows may briefly deny opening a replaced file. The reader
-            # contract returns None (retry next poll), never a partial object.
             if data is not None:
                 accepted.append(data)
             if data is not None and data.get("body") != "x" * 5000:

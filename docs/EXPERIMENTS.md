@@ -1,65 +1,32 @@
-# Experimentos do connectome
+# Connectome experiments
 
-Gerado em `2026-09-22T18:17:39.100817+00:00` com `flybrain 0.1.0`, 166700 neurônios, 25582938 conexões, backend `cpu`.
+Generated on `2026-09-22` with `flybrain 0.1.0`, 166,700 neurons, 25,582,938 connections, and the CPU backend. Each row aggregates five fixed seeds. Standalone scenarios reset the brain, encoder, and decoder; phases within a scenario preserve voltage, spikes, encoder state, and decoder smoothing. Rates are spikes per neuron per simulated second. The decoder receives only DNa02, DNp01, DNg100, and MDN rates.
 
-Cada linha agrega cinco execuções, uma para cada seed fixa. O cérebro, encoder e decoder são resetados entre cenários; fases do mesmo cenário preservam voltagens, spikes, estado do encoder e suavização do decoder. Frequências são spikes por neurônio por segundo na janela de 1 s. A latência é de parede, inclui a instrumentação das sondas adicionais e não é determinística. `DNp01` é o máximo entre os dois lados; `other_DNs` mostra o maior candidato adicional por frequência média. O decoder recebeu somente as oito taxas de DNa02, DNp01, DNg100 e MDN.
+| Scenario / phase | DNa02 L | DNa02 R | DNp01 | DNg100 | MDN | Decision | Consistency | Latency |
+| --- | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: |
+| threat left / low | 3.80 | 0.20 | 0.80 | 0.10 | 0.30 | turn_left | 100% | 214.6 ms |
+| threat left / medium | 4.00 | 0.00 | 17.80 | 0.10 | 0.50 | retreat | 100% | 215.5 ms |
+| threat left / high | 4.20 | 0.20 | 43.00 | 0.10 | 0.80 | retreat | 100% | 221.2 ms |
+| threat right / low | 0.20 | 3.00 | 0.40 | 0.20 | 0.35 | turn_right | 100% | 210.3 ms |
+| threat right / medium | 0.00 | 3.60 | 16.80 | 0.20 | 0.45 | retreat | 100% | 219.1 ms |
+| threat right / high | 0.00 | 4.00 | 39.20 | 0.10 | 0.70 | retreat | 100% | 217.6 ms |
+| threat front | 2.20 | 2.00 | 45.60 | 0.30 | 0.85 | retreat | 100% | 220.8 ms |
+| approaching slowly | 1.20 | 1.20 | 2.40 | 0.20 | 0.50 | retreat | 100% | 210.1 ms |
+| approaching quickly | 2.20 | 2.00 | 45.60 | 0.30 | 0.85 | retreat | 100% | 220.1 ms |
+| moving away | 1.00 | 1.00 | 0.00 | 0.20 | 0.30 | idle | 100% | 206.0 ms |
+| stationary | 1.00 | 1.00 | 0.00 | 0.20 | 0.30 | idle | 100% | 205.5 ms |
+| no stimulus | 0.00 | 0.40 | 0.00 | 0.10 | 0.35 | idle | 100% | 202.7 ms |
+| left → right / left | 3.80 | 0.20 | 0.80 | 0.10 | 0.30 | turn_left | 100% | 208.2 ms |
+| left → right / right | 0.40 | 3.00 | 0.20 | 0.00 | 0.25 | turn_right | 100% | 217.8 ms |
+| threat → silence / threat | 4.20 | 0.20 | 43.00 | 0.10 | 0.80 | retreat | 100% | 217.2 ms |
+| threat → silence / silence | 1.00 | 0.40 | 1.00 | 0.00 | 0.45 | retreat | 100% | 217.1 ms |
 
-| scenario / phase | DNa02_L | DNa02_R | DNp01 | DNg100 | MDN | other_DNs | decision | consistency | latency ms |
-|---|---:|---:|---:|---:|---:|---|---|---:|---:|
-| threat_left_low/stimulus | 3.80 | 0.20 | 0.80 | 0.10 | 0.30 | DNg103_L 6.40 | turn_left:5 | 100% | 214.6 ± 13.6 |
-| threat_left_medium/stimulus | 4.00 | 0.00 | 17.80 | 0.10 | 0.50 | DNp02_L 16.60 | retreat:5 | 100% | 215.5 ± 12.5 |
-| threat_left_high/stimulus | 4.20 | 0.20 | 43.00 | 0.10 | 0.80 | DNp02_L 39.60 | retreat:5 | 100% | 221.2 ± 9.8 |
-| threat_right_low/stimulus | 0.20 | 3.00 | 0.40 | 0.20 | 0.35 | DNg103_R 6.40 | turn_right:5 | 100% | 210.3 ± 6.8 |
-| threat_right_medium/stimulus | 0.00 | 3.60 | 16.80 | 0.20 | 0.45 | DNp02_R 16.00 | retreat:5 | 100% | 219.1 ± 17.5 |
-| threat_right_high/stimulus | 0.00 | 4.00 | 39.20 | 0.10 | 0.70 | DNp02_R 27.20 | retreat:5 | 100% | 217.6 ± 6.7 |
-| threat_front/stimulus | 2.20 | 2.00 | 45.60 | 0.30 | 0.85 | DNp02_L 35.80 | retreat:5 | 100% | 220.8 ± 11.4 |
-| approaching_slowly/stimulus | 1.20 | 1.20 | 2.40 | 0.20 | 0.50 | DNg103_L 6.40 | retreat:5 | 100% | 210.1 ± 8.9 |
-| approaching_quickly/stimulus | 2.20 | 2.00 | 45.60 | 0.30 | 0.85 | DNp02_L 35.80 | retreat:5 | 100% | 220.1 ± 8.2 |
-| moving_away/stimulus | 1.00 | 1.00 | 0.00 | 0.20 | 0.30 | DNg103_L 6.40 | idle:5 | 100% | 206.0 ± 7.2 |
-| stationary/stimulus | 1.00 | 1.00 | 0.00 | 0.20 | 0.30 | DNg103_L 6.40 | idle:5 | 100% | 205.5 ± 7.6 |
-| no_stimulus/silence | 0.00 | 0.40 | 0.00 | 0.10 | 0.35 | DNg103_L 6.60 | idle:5 | 100% | 202.7 ± 8.7 |
-| left_to_right/left | 3.80 | 0.20 | 0.80 | 0.10 | 0.30 | DNg103_L 6.40 | turn_left:5 | 100% | 208.2 ± 10.4 |
-| left_to_right/right | 0.40 | 3.00 | 0.20 | 0.00 | 0.25 | DNg103_L 7.40 | turn_right:5 | 100% | 217.8 ± 6.3 |
-| threat_then_silence/threat | 4.20 | 0.20 | 43.00 | 0.10 | 0.80 | DNp02_L 39.60 | retreat:5 | 100% | 217.2 ± 9.4 |
-| threat_then_silence/silence | 1.00 | 0.40 | 1.00 | 0.00 | 0.45 | DNg103_L 8.40 | retreat:5 | 100% | 217.1 ± 8.6 |
-| threat_then_silence/silence[2] | 1.60 | 0.40 | 0.00 | 0.10 | 0.20 | DNg103_L 8.00 | retreat:5 | 100% | 218.4 ± 7.3 |
-| threat_then_silence/silence[3] | 0.40 | 0.00 | 0.00 | 0.00 | 0.35 | DNg103_L 8.00 | idle:3, retreat:1, turn_left:1 | 60% | 223.1 ± 9.9 |
+The artifact [experiments/results.json](../experiments/results.json) contains stimuli, spikes, rates, action, latency, and residual state for each run. `other_DNs` records the strongest optional candidate probe; it is diagnostic only and is not an action rule. The persistence phase shows that a residual state can outlast the stimulus window, so it must be reported rather than interpreted as a direct world-state rule.
 
-## Definição dos estímulos
+Recreate the data with:
 
-- `threat_left_low`: Ameaça a -75°, baixa aproximação. stimulus=ângulo -75°, distância 12 m, closing_speed +0.25 m/s × 1
-- `threat_left_medium`: Ameaça a -75°, aproximação média. stimulus=ângulo -75°, distância 8 m, closing_speed +2 m/s × 1
-- `threat_left_high`: Ameaça a -75°, aproximação alta. stimulus=ângulo -75°, distância 4 m, closing_speed +8 m/s × 1
-- `threat_right_low`: Ameaça a +75°, baixa aproximação. stimulus=ângulo +75°, distância 12 m, closing_speed +0.25 m/s × 1
-- `threat_right_medium`: Ameaça a +75°, aproximação média. stimulus=ângulo +75°, distância 8 m, closing_speed +2 m/s × 1
-- `threat_right_high`: Ameaça a +75°, aproximação alta. stimulus=ângulo +75°, distância 4 m, closing_speed +8 m/s × 1
-- `threat_front`: Ameaça frontal simétrica em aproximação alta. stimulus=ângulo +0°, distância 4 m, closing_speed +8 m/s × 1
-- `approaching_slowly`: Alvo frontal aproximando lentamente. stimulus=ângulo +0°, distância 10 m, closing_speed +0.5 m/s × 1
-- `approaching_quickly`: Alvo frontal aproximando rapidamente. stimulus=ângulo +0°, distância 5 m, closing_speed +8 m/s × 1
-- `moving_away`: Alvo frontal afastando; looming é retificado em zero. stimulus=ângulo +0°, distância 6 m, closing_speed -4 m/s × 1
-- `stationary`: Alvo frontal imóvel; permanece apenas tracking visual. stimulus=ângulo +0°, distância 8 m, closing_speed +0 m/s × 1
-- `no_stimulus`: Nenhum alvo ou dano. silence=sem alvo × 1
-- `left_to_right`: Continuidade temporal: esquerda seguida por direita. left=ângulo -75°, distância 12 m, closing_speed +0.25 m/s × 1; right=ângulo +75°, distância 12 m, closing_speed +0.25 m/s × 1
-- `threat_then_silence`: Ameaça alta seguida por três janelas sem estímulo. threat=ângulo -75°, distância 4 m, closing_speed +8 m/s × 1; silence=sem alvo × 3
+```powershell
+python tools\fake_bg3.py --experiment
+```
 
-Intensidade não é uma ação nem uma classe comportamental. É apenas a combinação declarada de distância e velocidade de fechamento que o encoder transforma em voltagem de LC4/LPLC2/LPLC1; LC10a recebe tracking lateral. Velocidade negativa é retificada para zero no canal looming.
-
-## Persistência
-
-- `threat[1]`: DNp01 L/R 43.00/24.60 Hz; decisões {'retreat': 5}.
-- `silence[1]`: DNp01 L/R 1.00/0.20 Hz; decisões {'retreat': 5}.
-- `silence[2]`: DNp01 L/R 0.00/0.00 Hz; decisões {'retreat': 5}.
-- `silence[3]`: DNp01 L/R 0.00/0.00 Hz; decisões {'idle': 3, 'retreat': 1, 'turn_left': 1}.
-
-## Sondas de outros descending neurons
-
-- `DNp02` respondeu fortemente a looming alto: L/R 39.6/22.2 Hz para ameaça esquerda e 24.2/27.2 Hz para direita. `DNp11` também subiu para 25.0/13.2 e 13.0/25.0 Hz. Isso concorda com a literatura de jump/escape, mas nenhum deles entra no decoder atual.
-- `DNg13` mostrou resposta modesta e lateral em baixa intensidade: L/R 3.0/2.4 Hz para esquerda e 2.0/3.4 Hz para direita. É candidato a uma futura comparação de steering, ainda sem peso no readout.
-- `aSP22`, `DNa03` e `DNa11` aparecem no NPZ como descending neurons bilaterais e respondem de forma lateral a alvos periféricos (aSP22 baixa L/R 2.2/1.2; DNa03 baixa L/R 0.4/0.0), mas não há nesta bateria um padrão frontal específico que justifique um readout ATTACK.
-- `DNg103` apresentou baseline alto em silêncio (6.6/6.4 Hz) e pouca discriminação nesta bateria; não há base para tratá-lo como STOP. `DNp09`, `DNp26`, `DNp10` e `DNa01` também não produziram aqui um sinal mais limpo que os grupos atuais.
-
-O JSON contém, por execução e fase, o estímulo exato, spikes, todas as taxas monitoradas, scores, decisão, tempos e um resumo residual: voltagem média/p95 da rede, fração acima de 0,5, spikes do último step e voltagens agregadas dos DNs monitorados. Nenhum desses campos residuais é entrada do decoder.
-
-## Leitura cautelosa
-
-As seeds medem sensibilidade ao ruído do modelo, não variabilidade biológica. Simetria anatômica imperfeita, pequeno número de neurônios por tipo e estado inicial podem produzir diferenças laterais. Consistência aqui significa repetição dentro deste LIF e deste encoder, não validação contra comportamento real.
+These are synthetic observations of the frozen simulation, not evidence of a biological fly or BG3 combat performance.

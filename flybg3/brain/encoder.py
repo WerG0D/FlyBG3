@@ -26,8 +26,6 @@ class SensoryEncoder:
         if target and target["visible"] and target["distance"] <= c.max_distance:
             distance = max(target["distance"], c.object_radius)
             size = 2 * math.atan(c.object_radius / distance)
-            # Derivative of angular size in radians per second. Velocity estimates
-            # from game sampling are optional; identity changes do not create looming.
             growth = 0.0
             sampled = observation["sample_time_ms"] / 1000
             if self.previous and self.previous[0] == target["uuid"]:
@@ -38,7 +36,6 @@ class SensoryEncoder:
             if speed is not None:
                 growth = max(0.0, 2 * c.object_radius * speed / (distance**2 + c.object_radius**2))
             self.previous = (target["uuid"], size, sampled)
-            # Negative angle = left. Saturation preserves side for rear targets.
             lateral = max(-1.0, min(1.0, target["relative_angle"] / 90 * c.left_right_gain))
             strengths = {"LPLC2": growth * c.looming_gain,
                          "LC4": growth * c.looming_gain,
@@ -49,8 +46,6 @@ class SensoryEncoder:
                     drive[f"{t}_{side}"] = min(c.cap, value * weight)
         else:
             self.previous = None
-        # Damage is an explicit experimental proxy for a nondirectional threat,
-        # not a claim of stimulating identified nociceptors.
         for side in "LR":
             drive[f"LC4_{side}"] = min(c.cap, drive[f"LC4_{side}"]
                                          + (damage * c.damage_gain + health_stress * c.health_stress_gain) / 2)

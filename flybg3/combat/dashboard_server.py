@@ -58,9 +58,6 @@ class TelemetryBus:
                 try:
                     client.put_nowait(event)
                 except queue.Full:
-                    # Fast-changing snapshots may be replaced. Important events
-                    # are never silently dropped: detach a stalled client; the
-                    # durable JSONL is available for replay/history.
                     if kind in CRITICAL:
                         self.clients.discard(client)
                         try:
@@ -174,7 +171,6 @@ def make_handler(bus: TelemetryBus, tailer: EventTailer, frontend: Path):
                 path = tailer.current / "events.jsonl" if tailer.current else None
                 events = []
                 if path and path.exists():
-                    # At most the newest 2 MB, then the newest 1000 complete events.
                     with path.open("rb") as source:
                         source.seek(max(0, path.stat().st_size - 2_000_000))
                         if source.tell():
@@ -216,7 +212,7 @@ def make_handler(bus: TelemetryBus, tailer: EventTailer, frontend: Path):
                 return
             path = (frontend / route.lstrip("/")).resolve() if route != "/" else frontend / "index.html"
             if not path.is_relative_to(frontend.resolve()) or not path.is_file():
-                path = frontend / "index.html"  # Vite client-side route fallback
+                path = frontend / "index.html"
             if not path.is_file():
                 self._json({"error": "dashboard frontend not built; run scripts/dashboard_build.ps1"}, 503)
                 return

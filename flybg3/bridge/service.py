@@ -77,7 +77,6 @@ class BridgeService:
             if self.simulation is None:
                 raise RuntimeError("fly brain unavailable")
             if self.session != observation["session_id"]:
-                # New save/peer = a new experiment. Within session never reset.
                 if self.session is not None:
                     self.simulation.reset()
                     if self.speech:
@@ -100,11 +99,8 @@ class BridgeService:
         if "telemetry" in record:
             record["telemetry"]["decision"] = action.action.upper()
         record["recorded_at"] = datetime.now(timezone.utc).isoformat()
-        # Audit before publication. A logging failure stops this request safely.
         self._append_event(record)
         atomic_write_json(self.directory / "action.json", action.to_dict())
-        # A candidate from the trainable combat readout is audit-only. The
-        # BG3-facing action has already been published by the original decoder.
         if self.combat_probe and not action.debug.get("error"):
             try:
                 shadow = self.combat_probe.inspect(
@@ -116,8 +112,6 @@ class BridgeService:
                          shadow["request_id"], shadow["candidate_action"].upper())
             except Exception:
                 LOG.exception("Combat shadow failed; BG3 action already published")
-        # Strict side channel: the motor action is already decided, audited and
-        # published before any speech code sees the neural rates.
         if self.speech and not action.debug.get("error"):
             rates = record.get("neural_activity", {}).get("rates_hz")
             if rates:
@@ -166,7 +160,6 @@ class BridgeService:
                                 LOG.info("Manual neural reset %s", token)
                         observation = observation_at(self.directory / "observation.json", self.config.bridge.max_json_bytes)
                         if observation:
-                            # A heartbeat lease prevents processing leftover files after game exit.
                             hb = read_json(self.directory / "heartbeat_bg3.json")
                             fresh = (hb and hb.get("alive") is True and hb.get("session_id") == observation["session_id"]
                                      and type(hb.get("unix_ms")) in (int, float)

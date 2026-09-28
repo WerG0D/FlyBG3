@@ -16,14 +16,11 @@ class FlyBrainAdapter:
     def __init__(self, config: Config):
         import numba
         from flybrain import FlyBrain
-        # Application DEBUG should expose FlyBG3 records, not Numba compiler IR.
         logging.getLogger("numba").setLevel(logging.WARNING)
         numba.set_num_threads(min(config.performance.cpu_threads, numba.config.NUMBA_NUM_THREADS))
         self.config = config
         self.brain = FlyBrain(data=config.brain.data or None, seed=config.brain.seed,
                               device=config.performance.device, batch=1, dt=config.brain.dt)
-        # Display metadata only: `FlyBrain` exposes array indices/positions but
-        # not MaleCNS body IDs. Loading IDs does not touch dynamics or weights.
         if config.dashboard.enabled:
             from flybrain.data import ensure_data
             with np.load(ensure_data(config.brain.data or None) / "brain.npz") as meta:
@@ -36,7 +33,6 @@ class FlyBrainAdapter:
 
     def reset(self) -> None:
         self.brain.reset(self.config.brain.seed)
-        # Includes Numba JIT before advertising ready; no hidden reset per decision.
         for _ in range(self.config.brain.warmup_steps):
             self.brain.step()
 
@@ -50,7 +46,6 @@ class FlyBrainAdapter:
                 try:
                     observer.observe(fired)
                 except Exception:
-                    # Display failures never replace or suppress a neural decision.
                     logging.getLogger("FlyBG3").exception("Telemetry probe disabled for this decision")
                     observer.failed = True
                     observer = None

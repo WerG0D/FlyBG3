@@ -41,8 +41,6 @@ function Observation.collect(uuid, session, request, previous)
     local now = Ext.Timer.MonotonicTime()
     local nearest, best = nil, FlyBG3Config.MaxDistance
     local scan = {characters=0, hostile=0, in_range=0, visible=0}
-    -- Once per observation, never each Tick. Uuid enumeration is a documented
-    -- SE API; IsCharacter/IsEnemy/CanSee are real Osiris queries.
     for _, entity in ipairs(Ext.Entity.GetAllEntitiesWithComponent("Uuid")) do
         local target = entity.Uuid and Observation.uuid(entity.Uuid.EntityUuid)
         if target and target ~= uuid and entity.ServerCharacter and Osi.IsDead(target) == 0 then
@@ -58,7 +56,6 @@ function Observation.collect(uuid, session, request, previous)
                         scan.visible = scan.visible + 1
                         if distance < best then
                             best = distance
-                            -- BG3 Y up, clockwise yaw in degrees; +Z is reference forward.
                             local bearing = math.deg(math.atan(dx, dz))
                             nearest = {uuid=target, distance=distance,
                                 relative_angle=(bearing-yaw+180)%360-180, visible=true}

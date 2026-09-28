@@ -37,7 +37,6 @@ class EpisodeRunner:
             self.sink({"schema_version": 1, "event": event, "episode_id": episode_id,
                        "request_id": request_id, "timestamp": _time(), "payload": payload})
         except Exception:
-            # Visualization/log subscribers are passive; never change a decision.
             import logging
             logging.getLogger("FlyBG3").exception("Combat telemetry subscriber failed")
 
@@ -96,7 +95,6 @@ class EpisodeRunner:
             outcome, terminal, result = arena.step(proposed.action)
             self._emit("action_result", episode_id, request_id,
                        {"action": proposed.action.value, **asdict(outcome)})
-            # The reward is only computed after the arena action has returned an outcome.
             breakdown = self.reward.calculate(outcome)
             self._emit("reward", episode_id, request_id, breakdown.to_dict())
             next_features = None

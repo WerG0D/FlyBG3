@@ -50,7 +50,6 @@ class WindowsSpeechProvider:
     def speak(self, text: str) -> None:
         if not text or len(text) > 200:
             raise ValueError("TTS phrase must contain 1..200 characters")
-        # Base64 prevents speech text from becoming executable PowerShell syntax.
         encoded_text = base64.b64encode(text.encode("utf-8")).decode("ascii")
         script = ("Add-Type -AssemblyName System.Speech; "
                   "$v = [System.Speech.Synthesis.SpeechSynthesizer]::new(); "

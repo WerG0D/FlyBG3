@@ -1,68 +1,51 @@
-# FlyBG3Arena: campo de testes no BG3 Toolkit
+# FlyBG3Arena test field
 
-O projeto **FlyBG3Arena** foi criado no BG3 Toolkit 4.1.1.6931813. Ele acrescenta quatro caixas e, após a edição de 24/09/2026, quatro personagens ao nível herdado `Basic_Level_A`: um `Goblin Brawler`, um `BASE_Mephit` e dois `Dragon_Red`. É um cenário separado do mod neural FlyBG3: nenhuma regra do encoder, connectome ou decoder foi alterada.
+`FlyBG3Arena` was created in BG3 Toolkit 4.1.1.6931813. It adds four crates and, after the 2026-09-24 edit, four characters to inherited level `Basic_Level_A`: a Goblin Brawler, a base Mud Mephit, and two red dragons. It is separate from the neural FlyBG3 module; it does not change the encoder, connectome, or decoder.
 
 ```text
-                marcador C
+                marker C
 
-goblin          START          marcador B
+goblin          START          marker B
 
-marcador A                     marcador D
+marker A                        marker D
 ```
 
-Os marcadores são itens `CONT_GEN_Crate_Clothing_A` criados pelo Toolkit. O alvo usa o root template `Goblins_Female_Guard` (nome mostrado no editor: `Goblin Brawler`). As posições registradas nos arquivos locais, em coordenadas do nível `(x, y, z)`, são:
+Objects are `CONT_GEN_Crate_Clothing_A` instances placed by the Toolkit. The goblin uses `Goblins_Female_Guard`. Coordinates from the saved LSF files are:
 
-| Objeto | Posição |
+| Object | Position (x, y, z) |
 | --- | --- |
 | Goblin Brawler | `(-3.627, 0, -2.580)` |
-| Caixa 000 (marcador A) | `(0.955, 0, -3.418)` |
-| Caixa 001 (marcador B) | `(8.272, 0, 7.577)` |
-| Caixa 002 (marcador C) | `(0.276, 0, 10.583)` |
-| Caixa 003 (marcador D) | `(5.280, 0, 0.281)` |
+| Crate 000 / marker A | `(0.955, 0, -3.418)` |
+| Crate 001 / marker B | `(8.272, 0, 7.577)` |
+| Crate 002 / marker C | `(0.276, 0, 10.583)` |
+| Crate 003 / marker D | `(5.280, 0, 0.281)` |
 
-Essas posições vieram dos `.lsf` salvos pelo editor e convertidos para inspeção com LSLib. O esquema acima é apenas visual: ainda não medimos os ângulos dos marcadores em relação ao yaw do Flyman. O `Basic_Level_A` fornece terreno, iluminação, ponto inicial e navegação. A disposição serve para observação e deslocamento em uma área vazia. As caixas **não formam paredes contínuas**.
+The crates are visual markers, not continuous walls. `Basic_Level_A` provides terrain, lighting, the start point, and navigation.
 
-## Abrir e testar no Toolkit
+## Edit and package
 
-1. Abra **Baldur's Gate 3 Toolkit**.
-2. Selecione o projeto `FlyBG3Arena`.
-3. No Level Browser, escolha `Basic_Level_A`.
-4. Pressione `Ctrl+Enter` para entrar em Game Mode. O avatar de teste, quatro caixas e os personagens da arena devem aparecer. Pressione `Ctrl+Enter` novamente para voltar ao editor.
-5. Salve alterações adicionais com **File → Save all** (`Ctrl+Alt+S`). O Toolkit escreve objetos em `Data\Mods\FlyBG3Arena_00a41563-37f2-988d-98c9-5ca9bb65423a\Levels\Basic_Level_A`.
-
-O teste inicial de Game Mode foi executado nesta máquina: o terreno, as quatro caixas, o goblin e a interface do avatar carregaram. As três criaturas adicionadas depois aparecem no editor; a nova versão empacotada ainda requer verificação em jogo. O teste do editor **não comprova** que os personagens sejam hostis ao Flyman nem que o Script Extender funcione dentro do processo do Toolkit. Para decisões neurais, mantenha o fluxo BG3 + Script Extender + bridge Python já descrito no README.
-
-## Arquivos e instalação no jogo normal
-
-Os arquivos gerados pelo Toolkit foram copiados para `bg3-mod/FlyBG3Arena/Mods/`. O arquivo `toolkit/FlyBG3Arena/Projects/.../meta.lsx` preserva a identidade do projeto para recuperação em outra instalação. O UUID do módulo `00a41563-37f2-988d-98c9-5ca9bb65423a` foi emitido pelo Toolkit; não é um UUID de NPC nem do save. A arena e o FlyBG3 têm módulos distintos para impedir que uma publicação do editor substitua os scripts do mod neural.
-
-Após editar, use **File → Save all** no Toolkit, feche o Toolkit e o BG3 e, no PowerShell na raiz do repositório, execute:
+1. Open BG3 Toolkit and select `FlyBG3Arena`.
+2. Choose `Basic_Level_A` in Level Browser.
+3. Use `Ctrl+Enter` for Game Mode and `Ctrl+Enter` again to return.
+4. Save with **File → Save all** (`Ctrl+Alt+S`).
+5. Close Toolkit and BG3, then run:
 
 ```powershell
 .\scripts\update_arena.ps1 -DivineExe 'C:\Users\Wer\Downloads\Packed\Tools\Divine.exe'
 ```
 
-O script sincroniza os arquivos salvos em `Data\Mods\FlyBG3Arena_...` com a fonte versionada, constrói o PAK, instala com `-Force` e confere SHA-256. Ele interrompe a atualização se encontrar arquivos que existem apenas na fonte versionada, para que uma remoção feita no editor seja revisada antes de apagar dados. Se o PAK instalado estiver aberto em outro processo, feche o Toolkit e o jogo e tente novamente. Para apenas sincronizar e empacotar, sem instalar, use `-BuildOnly`.
-
-Também é possível executar as etapas de empacotamento e instalação separadamente, após sincronizar os arquivos do Toolkit:
+The script syncs Toolkit files, builds the PAK, installs it with `-Force`, and checks SHA-256. Use `-BuildOnly` to skip installation. The separate commands are:
 
 ```powershell
 .\scripts\build_arena.ps1 -DivineExe 'C:\Users\Wer\Downloads\Packed\Tools\Divine.exe'
 .\scripts\install_mod.ps1 -PackageName FlyBG3Arena -Force
 ```
 
-O PAK atualizado foi compilado e listado com `Divine.exe`; contém quatro personagens e quatro itens de `Basic_Level_A` (10 entradas no total). Foi copiado para `%LOCALAPPDATA%\Larian Studios\Baldur's Gate 3\Mods\FlyBG3Arena.pak`, e o hash do arquivo instalado foi comparado ao gerado. Ative `FlyBG3Arena` e `FlyBG3` no gerenciador de mods antes de usar ambos no jogo. Se o gerenciador mostrar duas entradas para `FlyBG3Arena` (projeto solto em `Data` e PAK), ative **uma** delas; o PAK versionado é o artefato para o jogo, e os arquivos soltos servem à edição no Toolkit. Depois de atualizar, reinicie o BG3 e teste a arena a partir de um save anterior à visita ao nível. O usuário confirmou que a versão anterior da arena, os objetos, o Flyman e o combate abriram no jogo normal; a nova composição ainda precisa ser testada dentro do BG3.
+Activate both `FlyBG3Arena` and `FlyBG3` in the mod manager. Restart BG3 and test from a save made before entering the level. The Toolkit editor preview does not prove hostility, Script Extender behavior, or neural decisions in the normal game.
 
-## Teste neural no jogo normal
+## Neural test
 
-Inicie o bridge em um terminal PowerShell separado e mantenha esse processo aberto enquanto joga:
-
-```powershell
-cd 'C:\Users\Wer\Documents\ChatGPT\FlyBG3'
-.\scripts\run_bridge.ps1
-```
-
-Aguarde `166700 neurons loaded` e `Waiting for observation...`. No console **server** do Script Extender, use:
+Start the bridge, then in the BG3SE server console use:
 
 ```text
 Osi.TeleportPartiesToLevelWithMovie("Basic_Level_A", "FlyBG3Arena_Arrive", "")
@@ -73,14 +56,4 @@ Osi.TeleportPartiesToLevelWithMovie("Basic_Level_A", "FlyBG3Arena_Arrive", "")
 !flybg3_observe
 ```
 
-O prefixo `!` é necessário para os comandos registrados pelo mod; sem ele, o console tenta interpretar `flybg3_combat_move on` como Lua e produz erro de sintaxe. O resultado de `!flybg3_status` deve conter `brain=ready` e `heartbeat_age_ms` abaixo de 5000. Se aparecer `brain=offline`, confira se o terminal do bridge continua em execução e se terminou de carregar o MaleCNS. Depois, envie **uma nova** observação: `!flybg3_observe`. O jogo ignora respostas antigas, portanto observações feitas antes de iniciar o bridge não serão repetidas.
-
-O primeiro teste no jogo mostrou `Observation #N sent` e a seleção de um hostil visível no turno do Flyman. As decisões desse teste deram `Brain bridge offline/stale; IDLE`, pois não havia processo Python ativo e o último `heartbeat_brain.json` tinha parado de atualizar. Em 24/09/2026, após iniciar o bridge e carregar o MaleCNS, o console confirmou `brain=ready, heartbeat_age_ms=191`, `Observation #2 sent` e `Neural decision #2: IDLE`. O log Python confirmou o processamento do mesmo request e uma simulação de aproximadamente 424 ms. Nessa observação havia `in_range=0, visible=0`; o teste comprova o protocolo ao vivo, mas não uma resposta motora a um hostil. O bridge precisa ser iniciado novamente depois de encerrar o processo Python ou reiniciar o Windows.
-
-Para atualizar o repositório depois de editar a arena no Toolkit, copie os novos arquivos de `Data\Mods\FlyBG3Arena_00a41563-37f2-988d-98c9-5ca9bb65423a` para a pasta de mesmo nome em `bg3-mod/FlyBG3Arena/Mods/`, revise o diff e execute novamente `build_arena.ps1`. Não copie arquivos do projeto `FlyBG3` sobre esta pasta.
-
-## Limitação para uma sala fechada
-
-**LIMITAÇÃO:** esta instalação do Toolkit está em `USER MODE`; o Level Browser não oferece `Create` para um nível novo. A [atualização oficial de Patch 8](https://baldursgate3.game/news/the-final-patch-new-subclasses-photo-mode-and-cross-play_138) permite adicionar ou substituir itens, personagens e triggers em níveis existentes, mas não criar prédios, cenário estático nem terreno novo. **CAUSA:** restrições da edição parcial de níveis do Toolkit oficial. **EVIDÊNCIA:** a interface observada só mostrou níveis herdados; a Larian descreve expressamente esses limites. **ALTERNATIVA:** o campo `Basic_Level_A` acima permite testes imediatos. Para uma sala fechada original, será necessária uma versão desbloqueada como [MoonGlasses](https://www.nexusmods.com/baldursgate3/mods/12308) e um fluxo de nível novo; o [guia comunitário de criação de nível](https://wiki.bg3.community/Tutorials/Toolkit/Creating-a-new-level) descreve o template `Basic_Level_A` como ponto de partida. A instalação e compatibilidade do MoonGlasses com este build do Toolkit não foram validadas aqui.
-
-A API oficial [TeleportPartiesToLevelWithMovie](https://docs.baldursgate3.game/index.php?title=TeleportPartiesToLevelWithMovie) aceita nome do nível, evento e filme. A chamada manual acima abriu `Basic_Level_A` no jogo normal. Use um save descartável para repetir o teste; nenhuma viagem automática foi adicionada ao mod.
+The `!` prefix is required. `brain=ready` and a fresh heartbeat are required before observing. The game ignores stale responses. The Toolkit USER MODE cannot create a new closed level in this installation; use `Basic_Level_A` for immediate tests or a separately validated level-authoring workflow.

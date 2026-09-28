@@ -1,154 +1,55 @@
-# Pesquisa de APIs — 2026-09-21
+# Technical research record
 
-## Extensão de aprendizado de combate (2026-09-25)
+This document records the APIs and evidence used by FlyBG3. It distinguishes verified behavior from plans and from observations that require a real BG3 save.
 
-A auditoria específica de plasticidade, estados persistentes e posições anatômicas está em [LEARNING_RESEARCH.md](LEARNING_RESEARCH.md). `flybrain==0.1.0` não implementa atualização de pesos, STDP ou recompensa neural; o laboratório aprende somente um readout linear externo. `brain.npz` contém soma positions e IDs reais, utilizados pela amostra visual. A escolha `BASIC_ATTACK` na arena é uma categoria de política treinável, **não** uma associação biológica comprovada de qualquer DN a ataque.
+## Sources
 
-## TTS local para verbalização neural (2026-09-24)
+- [fly.ai](https://github.com/alextitonis/fly.ai) and the installed `flybrain==0.1.0` package;
+- [MaleCNS v1.0](https://male-cns.janelia.org/);
+- [BG3 Script Extender](https://github.com/Norbyte/bg3se) and its [Lua API](https://github.com/Norbyte/bg3se/blob/main/Docs/API.md);
+- [official BG3 scripting documentation](https://docs.baldursgate3.game/);
+- [LSLib/Divine](https://github.com/Norbyte/lslib).
 
-O provider opcional usa [`System.Speech.Synthesis.SpeechSynthesizer.Speak`](https://learn.microsoft.com/en-us/dotnet/api/system.speech.synthesis.speechsynthesizer.speak?view=netframework-4.8.1) da Microsoft em Windows PowerShell 5.1. A API é síncrona; por isso só é chamada no worker de áudio, nunca no loop BG3/Python. A documentação da classe confirma `Rate` (-10..10), `Volume` (0..100), saída para dispositivo padrão e o método `Speak`. Nesta máquina, `Add-Type -AssemblyName System.Speech` encontrou Microsoft Maria Desktop e Microsoft Zira Desktop; `python -m flybg3 speech-test` executou as quatro frases locais sem erro. O texto é codificado em Base64 antes de entrar no script PowerShell; não é interpretado como código. Não foi adicionada dependência Python de TTS nem serviço de rede.
+## Installed neural API
 
-## Evidência e versões
+The installed package exposes `FlyBrain(data=None, seed=..., device=..., batch=1, dt=...)`, `step(eye_drive=None, inject=())`, `reset(seed)`, `cells(types, side=...)`, and `info`-compatible metadata. `step()` returns indices of neurons that fired. The local MaleCNS dataset reports 166,700 neurons, 25,582,938 aggregated connections, and 1,314 descending neurons. We use point-neuron LIF dynamics with `dt=0.02` and keep the connectome weights frozen.
 
-Repositório inicialmente vazio. Fontes consultadas antes de implementar:
+Required sensory types verified in the dataset are `LC4`, `LPLC2`, `LPLC1`, and `LC10a`. Motor readout groups are `DNa02`, `DNp01`, `DNg100`, and `MDN`. Additional candidate groups are exposed only as research probes; names are resolved from metadata and missing optional groups are disabled.
 
-* [fly.ai](https://github.com/alextitonis/fly.ai), commit `5e931b8dc4856550565c5fa129d3d0c055af3dd1`.
-* PyPI `flybrain==0.1.0`, instalado em `.venv` com Python 3.12. O conteúdo de `flybrain/brain.py` é idêntico ao commit acima após normalizar quebras de linha. Inspeção local, não API inferida do README.
-* [BG3SE API](https://github.com/Norbyte/bg3se/blob/b2b7513264ce4d0e79a8e4a5ef9180506b7ab2f8/Docs/API.md), cabeçalho v30; commit `b2b7513264ce4d0e79a8e4a5ef9180506b7ab2f8`.
-* [Move With Minimap](https://github.com/tldev/bg3-move-with-minimap-mod), commit `a660d231905be290ef7d0e207d53ea36f21c3a2d`, exemplo real server-side Lua/Osiris.
-* [Documentação de scripting Larian](https://docs.baldursgate3.game/).
+The encoder maps abstract observations to sensory current. It does not choose an action. The motor decoder reads descending firing rates only. Speech and combat shadow decoders are parallel consumers of those rates and cannot call `step()` or inject current.
 
-## flybrain
+## File bridge
 
-`FlyBrain(data=None, seed=64, device=None, batch=1, dt=None, sensory_input=True, refractory=0.0)`.
-`cells(types: list[str], side=None)` retorna índices NumPy por cell_type ou superclass.
-`step(eye_drive=None, inject=())` recebe pares `(índices, incremento de voltagem)`; com batch=1 retorna índices NumPy dos disparos. `reset(seed)` zera voltagem, disparos e RNG. A instância mantém estado entre steps.
+The bridge uses `Ext.IO.SaveFile`, `Ext.IO.LoadFile`, and `Ext.Json` in the server-side Lua mod. Python writes JSON through a temporary file and replace operation. Every observation and action includes `schema_version`, `session_id`, and monotonic `request_id`. A SQLite journal rejects duplicates. The action must match the current session and request; BG3 ignores stale responses.
 
-`n`, `weights`, `cell_type`, `side`, `superclass`, `groups`, `dt`, `steps` estão presentes no código instalado. O adaptador não treina nem altera pesos.
+Heartbeats are written to `heartbeat_bg3.json` and `heartbeat_brain.json`. The Python worker never blocks the BG3 main thread. A stale or absent bridge produces `IDLE` or leaves vanilla control, according to configuration.
 
-Valores upstream: dt=0.020 s, tau=0.100 s, gain=3, tonic=0.14, noise_hz=1.2, noise_amp=0.22. Modelo de neurônio pontual LIF: decaimento, soma sináptica, tônico, ruído, injeção; limiar 1 e reset 0. Tônico reescalado com dt. `device=auto` seleciona CUDA apenas quando CuPy detecta dispositivo; CPU usa Numba. Extra oficial `flybrain[gpu]` instala CuPy CUDA 12. Seeds não tornam CPU e GPU idênticos.
+## BG3 observation
 
-Download oficial: `python -m flybrain download`, cache `FLY_DATA` ou `~/fly-data`. Release brain-v1, dois arquivos NPZ, cerca de 258 MB. SHA256 upstream:
+The Lua collector uses documented engine queries and BG3SE entity enumeration to obtain Flyman's UUID, position, heading, HP, combat turn, and the nearest visible hostile. It computes distance, relative angle, and closing speed from successive samples. The current collector does not claim a complete visibility model or target HP. The encoder receives these values; decoders receive only neural activity.
 
-* brain.npz: `cc9bd1ecd00bd703a6fa648bc6ad145c93c7c1ee53debdcc9ce0d1f4305e6aca`
-* weights.npz: `c29919aa44069a271b1ee978abe05fa9bf6e45e4ba3e436e92b624ef1b5be40c`
+## Movement APIs
 
-Upstream declara 166700 neurônios, 25582938 arestas, 1314 descendentes. Arestas não são sinapses individuais: cada peso representa uma contagem de sinapses, sinalizada pelo neurotransmissor e normalizada por entrada.
+The physical executor validates a destination with `Ext.Level.BeginPathfindingImmediate`, `Ext.Level.FindPath`, and `Ext.Level.ReleasePath`, then calls the BG3SE Osiris proxy `Osi.CharacterMoveToPosition`. The native `glm::vec3` boundary requires a positional Lua table `{x, y, z}`. The executor calls Osiris proxies through `pcall` because BG3SE exposes them as callable proxy values rather than ordinary Lua functions.
 
-`eyes.py` injeta LC4, LPLC2, LPLC1, LC10a como detectores abstratos; evita o gargalo de neurônios graduados da lâmina. Os exemplos upstream associam DNa02 a steering, DNp01 a escape, DNg100 a andar para frente e MDN a andar para trás. Isso não valida automaticamente suas equivalências com ações humanas. Os grupos devem ser confirmados no NPZ e vazios devem causar erro explícito.
+The movement milestone was validated by the user in BG3SE v32: neural `TURN_RIGHT` and `TURN_LEFT` decisions produced corresponding physical steps. Movement is disabled by default in combat because `CharacterMoveToPosition` can bypass AP/turn economy and can fall back to teleport-like behavior when a destination is blocked. `!flybg3_combat_move on` is a disposable-save test option.
 
-## BG3SE
+## Turn and party control
 
-`Ext.IO.LoadFile(path, [context]) -> string?`, `Ext.IO.SaveFile(path, content) -> boolean`, `Ext.Json.Parse(text)`, `Ext.Json.Stringify(value, [options])` confirmados. `Lua/Libs/IO.inl` e `Extender/Shared/ScriptHelpers.cpp` mostram raiz UserProfile + `/Script Extender/`. Windows padrão: `%LOCALAPPDATA%\Larian Studios\Baldur's Gate 3\Script Extender\FlyBG3`. `SaveFile` cria diretórios mas NÃO oferece rename atômico. Python deve tolerar leituras parciais; respostas Python usam replace atômico no mesmo diretório.
+`CreateAtObject(template, anchor, temporary, playSpawn, event, matchOrientation)` creates the mod-owned Flyman template. `GetTemplate` verifies identity. `AddPartyFollower` is used because `MakePlayer` did not establish player control for the tested Mud Mephit save. `IsPartyFollower`, `IsPlayer`, `CharacterJoinedParty`, `GetHostCharacter`, and `IsInCombat` are used as state checks. The adapter refuses to control an unverified or uncontrolled entity.
 
-`Ext.Osiris.RegisterListener(name, arity, "after", handler)` confirmado. `TurnStarted` e `TurnEnded` têm 1 argumento. `Ext.Timer.WaitForRealtime(ms, callback)` e `MonotonicTime()` (ms) permitem polling leve não bloqueante. BootstrapServer.lua + Config.json com FeatureFlags=["Lua"] e ModTable são o caminho oficial.
+`EndTurn(character)` and `EntityEvent` are documented options for a future turn executor. `UseSpell` is not treated as a basic attack because documented precondition/resource behavior does not provide the desired action semantics. No attack is currently sent to BG3.
 
-## Movimento e combate: diferença importante
+## Mod packaging and Toolkit
 
-[CharacterMoveToPosition](https://docs.baldursgate3.game/index.php?title=CharacterMoveToPosition): `(character,x,y,z,"Walk"|"Run",event[,moveID])`. Existe, mas ignora AP/turno em combate e pode teleportar quando bloqueado. O exemplo Minimap usa 7 argumentos, testa navegação com `Ext.Level.BeginPathfindingImmediate`, `FindPath`, `ReleasePath` e bloqueia combate. Logo NÃO será apresentado como movimento normal balanceado de combate.
+The Mud Mephit root template inherits `MEPHIT_Mud_A` from the installed `Shared.pak`. LSLib converts LSX/LOCA sources to LSF/LOCA and builds the PAK. `FlyBG3Arena` is a separate Toolkit module for `Basic_Level_A`; it must not replace the neural module or Script Extender files. The current Toolkit USER MODE does not create a new closed level, so the inherited level is the supported test field.
 
-[EndTurn](https://docs.baldursgate3.game/index.php?title=EndTurn): `(target)`.
-[TurnStarted](https://docs.baldursgate3.game/index.php?title=TurnStarted): `(object)`.
-[CanSee](https://docs.baldursgate3.game/index.php?title=CanSee): `(source,target)->bool integer`, considera sneaking; tem efeito de registrar eventos de visão para certos pares de NPCs.
+## Real-save evidence
 
-Limites de validação: assinaturas confirmadas em código/documentação não equivalem a testes num save. Abrir BG3, selecionar personagem e testar movimento são validação manual obrigatória. A pesquisa será complementada com contagens e resultados executados.
+The real save produced `Observation #1` and a matching Python decision. A later turn with a visible hostile produced `TURN_RIGHT` and `TURN_LEFT`, matching request/session IDs and physical movement after pathfinding fixes. A Mud Mephit instance joined the party as `follower=1`, received a turn, and was protected by the template-scoped immortality test option. Bridge-offline timeouts were reproduced and fixed by starting the Python process and checking the heartbeat.
 
-## Descending neurons candidatos
+These observations validate the bridge and movement milestone only. They do not validate learned combat, biological interpretation, consciousness, or an attack policy. The current next experiment is the observation-only combat shadow probe described in [BG3_COMBAT_OBSERVE.md](BG3_COMBAT_OBSERVE.md).
 
-### Evidência no dataset instalado
+## Scientific limits
 
-O MaleCNS v1.0 é o conectoma completo de um único macho adulto, com 166.700 neurônios anotados. A página oficial oferece exploração por cell type, consultas neuPrint e os arquivos Feather usados pelo `flybrain`. Fonte: [MaleCNS](https://male-cns.janelia.org/), [downloads v1.0](https://male-cns.janelia.org/download/) e [Berg et al., Cell 2026](https://doi.org/10.1016/j.cell.2026.08.015).
-
-`flybrain/build.py` escolhe `flywireType`, com fallback para `type`, e seleciona `superclass == descending_neuron`. A inspeção de `brain.npz` confirmou que todos os grupos abaixo estão dentro dos 1.314 descending neurons. Contagens são L/R:
-
-| tipo | L/R | hipótese funcional | uso em FlyBG3 0.1 |
-|---|---:|---|---|
-| DNa02 | 1/1 | steering de alto ganho | decoder esquerda/direita |
-| DNp01 | 1/1 | giant fiber, escape/take-off | decoder retreat |
-| DNg100 | 1/1 | forward no `fly.ai`/Fly64; alias BDN2 indicado no código upstream | decoder approach |
-| MDN | 2/2 | backward walking | decoder retreat |
-| DNa01 | 1/1 | steering de baixo ganho | somente sonda experimental |
-| DNb02 | 2/2 | turning/steering | somente sonda experimental |
-| DNg13 | 1/1 | steering, com alvo motor distinto de DNa02 | somente sonda experimental |
-| DNa03, DNa11 | 1/1 cada | steering em navegação e interações sociais | somente sondas experimentais |
-| aSP22 | 1/1 | necessário para pursuit/courtship no macho | somente sonda experimental |
-| DNp09 | 1/1 | forward/pursuit; freezing depende do contexto | somente sonda experimental |
-| DNp26 | 1/1 | aumento global de locomoção em tela optogenética | somente sonda experimental |
-| DNp02, DNp10, DNp11 | 1/1 cada | jump/escape | somente sondas experimentais |
-| pIP10, pMP2 | 1/1 cada | vias descendentes de courtship song, não ataque | somente sondas de comparação |
-| DNg103 | 1/1 | sem função assumida neste projeto | somente sonda de comparação, sem rótulo motor |
-
-`oDN1` é descrito como forward/bolt walking na literatura e aparece no conjunto conceitual do `fly.ai`, mas o próprio `fly.ai/wiz/dnscreen.py` registra “oDN1 is not in the data”. A consulta exata a `brain.cells(["oDN1"])` retorna zero; portanto ele não foi usado. `DNg12` existe no MaleCNS como `DNg12_a`…`DNg12_e`, e não como o nome agregado `DNg12`; também ficou fora desta primeira bateria.
-
-### Evidência funcional e cautelas
-
-* [Yang et al., eLife 2025](https://elifesciences.org/articles/102230) mediram DNa01 e DNa02 em moscas andando: DNa02 prediz steering de alto ganho e DNa01, baixo ganho. Isso sustenta a lateralidade, não uma equivalência direta com “virar um humanoide”.
-* [Rayshubskiy et al., Current Biology 2023](https://pubmed.ncbi.nlm.nih.gov/37904997/) distinguem as saídas de DNa02 e DNg13 nos circuitos motores das pernas; ambos são relacionados a steering.
-* [Braun et al., Nature 2024](https://www.nature.com/articles/s41586-024-07523-9) mostram redes de DNs: DNp09 dirige forward walking e conecta-se a DNa02/DNb02; DNa01, DNa02 e DNb02 caem em comunidades de walking/steering. Isso recomenda leitura populacional, não tratar todo DN como botão isolado.
-* [Berg et al., MaleCNS 2026](https://pmc.ncbi.nlm.nih.gov/articles/PMC12636603/) identificam caminhos visuais sexualmente dimórficos até onze DNs, incluindo DNa02 e aSP22, necessários para steering/pursuit do macho; DNg13 aparece como via geral de steering. O NPZ instalado contém aSP22, DNa03 e DNa11 bilateralmente dentro da superclass `descending_neuron`.
-* [Bidaye et al./Chen et al., Nature Communications 2020](https://www.nature.com/articles/s41467-020-19936-x) resumem e testam MDN como comando de backward walking e seus alvos no VNC.
-* [Simpson, Current Opinion in Neurobiology 2024](https://pmc.ncbi.nlm.nih.gov/articles/PMC11215313/) revisa DNp01 como giant fiber de escape, DNp02/DNp10/DNp11 como jump/escape, DNp09 como freezing ou forward/pursuit, oDN1 como bolt forward e DNa02/DNg13 como steering.
-* [Zacarias et al., Nature Communications 2018](https://pmc.ncbi.nlm.nih.gov/articles/PMC6135764/) encontraram necessidade/suficiência de DNp09 para freezing em um paradigma de looming, mas a ativação inicialmente acelera a marcha e depois produz imobilidade. [Ache et al., Current Biology 2021](https://pmc.ncbi.nlm.nih.gov/articles/PMC8716191/) não encontraram efeito de silenciar DNp09 no freezing mediado por LC11. Assim, DNp09 não é adotado como “STOP” inequívoco.
-* [Cande et al., eLife 2018](https://elifesciences.org/articles/34275) é uma tela optogenética ampla: DNa01, DNa02 e DNp26 são alguns dos tipos com aumento global de locomoção. Fenótipo por ativação não prova que spikes naturais tenham uma única semântica.
-
-As sondas adicionais são apenas medidas em `experiments/results.json`. O decoder de produção permanece exatamente com DNa02, DNp01, DNg100 e MDN; posição, distância, direção e velocidade nunca entram nele.
-
-A bateria regenerada em 2026-09-22 incluiu `aSP22`, `DNa03`, `DNa11`, `pIP10` e `pMP2`. `aSP22`, `DNa03` e `DNa11` mostraram lateralidade em alvos periféricos, coerente com pursuit/steering, mas nenhum deles apresentou um padrão frontal separado de looming/escape. `pIP10` e `pMP2` foram mantidos apenas como comparação de courtship song. O resultado não justifica ainda um `ATTACK` neural: a próxima implementação deve ser uma calibração experimental de readout, não uma regra de distância.
-
-## Estado da integração local BG3
-
-Verificação local em 2026-09-21 confirmou a instalação completa. O manifesto Steam (`appmanifest_1086940.acf`) informa `StateFlags=4`, `SizeOnDisk=159057747491`, `BytesDownloaded=BytesToDownload` e build `24532579`. Os executáveis `bin/bg3.exe` e `bin/bg3_dx11.exe` estão presentes (ProductVersion `4.1.1.7398727`). O loader do Script Extender está em `bin/DWrite.dll` (Norbyte, versão de arquivo `5.0.0.0`, SHA-256 `8F3C0782461CC280CAB4ADFC270979549211F6CAC91AD851BAA2B2716118ECB0`).
-
-O pacote de teste foi criado pelo Divine do LSLib em `C:\Users\Wer\Downloads\Packed\Tools\Divine.exe` e instalado como `%LOCALAPPDATA%\Larian Studios\Baldur's Gate 3\Mods\FlyBG3.pak`. A listagem do pacote contém `meta.lsx`, `ScriptExtender/Config.json` e os cinco arquivos Lua do milestone log-only. Um processo `bg3_dx11.exe` foi iniciado para a verificação e carregou `BG3ScriptExtender.dll` versão `32.0.0.0`; ainda não houve carregamento de save nem observação pelo console, e `LastPlayed=0` continua no manifesto porque a execução foi iniciada diretamente pelo executável. A validação em jogo requer habilitar o mod no gerenciador, carregar um save e observar o console.
-
-O milestone atual avançou para um executor físico guardado. `BootstrapServer.lua` carrega `ActionExecutor.lua`, que pode chamar `Osi.CharacterMoveToPosition` somente depois de uma resposta neural correspondente, com estímulo atual e revalidação do estado do personagem. `AllowCombatMovement=false` por padrão porque a chamada oficial ignora AP/turno em combate e pode teleportar quando o destino está bloqueado. Não são chamados `EndTurn`, `PurgeOsirisQueue` ou APIs de transformação. A bridge Python continua separada e não bloqueia a thread do BG3.
-
-### Validação viva
-
-O fluxo log-only foi comprovado em um save real com o UUID fornecido pelo usuário. O BG3 escreveu `Observation #1`, o Python executou o MaleCNS e o jogo registrou `Neural decision #1: IDLE`. Essa resposta foi coerente: a observação ocorreu fora de combate, sem `nearest_hostile` e sem dano; todos os estímulos do encoder foram zero e os scores motores ficaram abaixo do limiar.
-
-Na mesma sessão, o jogo produziu dezesseis observações reais. A request 16 ocorreu durante o turno de Flyman, com um hostil visível a 2,72 m e ângulo relativo de +118,47°. O connectome gerou DNa02_L=1 Hz e DNa02_R=3 Hz; o decoder escolheu `TURN_RIGHT` com confiança 0,806 e a resposta manteve os mesmos `session_id`, `request_id` e UUID. Latência total: 379,5 ms. Isso comprova BG3 → observação → encoder → MaleCNS → descending neurons → decoder → `action.json` → BG3 log. A validação de movimento físico ainda exige uma nova sessão carregando o pacote atualizado.
-
-### Primeira tentativa de movimento em combate
-
-O teste seguinte comprovou seis decisões neurais consecutivas durante o turno de Flyman (`TURN_RIGHT`, depois `TURN_LEFT`), mas todas foram recusadas antes do comando físico com `pathfinding_request_failed`. A falha foi isolada na conversão Lua → `glm::vec3`: o projeto passava `{x=..., y=..., z=...}`, enquanto a ligação oficial declara `BeginPathfindingImmediate(lua_State*, EntityHandle, glm::vec3)` e o exemplo real Move With Minimap passa uma tabela posicional `{x, y, z}`. O executor agora converte explicitamente o ponto interno para `{point.x, point.y, point.z}` na fronteira BG3SE e inclui o erro original de `pcall` no log. Nenhuma parte do encoder, MaleCNS ou decoder foi alterada.
-
-O teste após essa correção avançou pelo pathfinder e parou em `CharacterMoveToPosition_unavailable`. A chamada existe; a detecção estava errada. `BG3Extender/Lua/Osiris/FunctionProxy.h` define nomes `Osi.*` como `LightCppValue` com a interface `Callable`, e `FunctionProxy.inl` encaminha `__call` para `LuaCall`. Portanto `type(Osi.CharacterMoveToPosition) == "function"` não é uma verificação válida. O executor passou a chamar o proxy diretamente dentro de `pcall`; se o nome ou a aridade não existirem, o próprio BG3SE fornece um erro preciso. O teste Lua representa `CharacterMoveToPosition` como tabela com `__call` para cobrir esse comportamento.
-
-O pacote seguinte foi validado pelo usuário em BG3SE v32 (build de 21 de junho de 2026). As requests 1–3 produziram `IDLE` e não moveram o personagem. A request 4 produziu `TURN_RIGHT` e o console registrou `Physical action #4: TURN_RIGHT (issued)`; a request 5 produziu `TURN_LEFT` e registrou a ação correspondente. O personagem moveu-se fisicamente nas duas direções corretas. Isso fecha o milestone completo BG3 → observação → MaleCNS → descending neurons → decoder → resposta correlacionada → pathfinder → movimento real.
-
-### Próxima fronteira de combate
-
-`EndTurn(character)` é uma chamada Osiris documentada e pode encerrar o turno depois de uma ação neural concluída. `CharacterMoveToPosition` pode emitir um `EntityEvent` ao chegar, o que oferece uma sincronização orientada a eventos. Já `UseSpell(caster, spell, target, ...)`, embora documentada, ignora pré-condições como acesso à habilidade e recursos. Ela não deve ser apresentada como um ataque básico normal nem habilitada silenciosamente. O decoder atual também não possui um canal neural biologicamente sustentado para `ATTACK`; transformar proximidade em ataque no executor violaria a regra de que o estado do jogo não escolhe a ação. Ataque permanece pendente até existir um readout neural explícito e uma execução cuja semântica de economia de turno esteja documentada.
-
-O primeiro adaptador de ciclo de turno usa exatamente essa rota documentada. Cada movimento recebe `FlyBG3_Move_<request_id>` e um `moveID` correspondente. `EntityEvent(object,event)` marca chegada e, somente com `!flybg3_auto_end on`, chama `EndTurn` se o mesmo personagem ainda estiver no próprio turno. Uma decisão neural `IDLE` pode encerrar o turno sem aguardar evento físico. `CharacterMoveToCancelled(character,moveID)` e timeout apenas limpam o estado pendente e registram a falha. A opção é desligada por padrão até validação no save.
-
-## Migração para corpo Mud Mephit (2026-09-22)
-
-O pedido atual é deixar de usar o avatar do usuário como corpo. O `Shared.pak` da instalação foi listado e convertido com LSLib; `Public/Shared/RootTemplates/_merged.lsf` contém `MEPHIT_Mud_A`, `MapKey=f765566e-3f98-457b-9048-59bdcc66f51d`, `Type=character`, `Stats=Mephit_Mud`, visual `0920593a-1091-dda9-7b5b-7ee3cb87c266` e animação `c9a06010-8832-662d-81c8-eb7b241db730`. Esses identificadores provêm do jogo instalado, não de exemplos inventados. O novo root do mod usa `ParentTemplateId` igual ao MapKey de `MEPHIT_Mud_A`; a [documentação do Toolkit sobre root templates herdados](https://docs.baldursgate3.game/Adding_Armour) e o [esquema comunitário](https://github.com/NellsRelo/bg3-schema/blob/main/regions/Templates/_REGION.md) corroboram o formato `MapKey`/`ParentTemplateId`. O LSX e a localização foram compilados com `Divine.exe` para LSF/LOCA e o PAK resultante lista ambos.
-
-Para criar uma instância, a API oficial [CreateAtObject](https://docs.baldursgate3.game/index.php?title=CreateAtObject) aceita `(template, anchor, temporary, playSpawn, event, matchOrientation)` e retorna o objeto criado. [GetTemplate](https://docs.baldursgate3.game/index.php?title=GetTemplate) verifica que uma instância tem o root próprio do mod. A primeira implementação usou [MakePlayer](https://docs.baldursgate3.game/index.php?title=MakePlayer) porque a documentação diz que transforma um NPC em personagem jogável. O host é só âncora/owner. [GetHostCharacter](https://docs.baldursgate3.game/index.php?title=GetHostCharacter) é uma solução de debug/single-player; a própria documentação alerta que não é adequada para multiplayer. O comando de spawn é explicitamente manual e restrito a fora de combate por esse motivo.
-
-Na investigação de 22 de setembro, o executável `Glasses.exe` da BG3 Toolkit existia na instalação Steam, mas a interface rejeitava a pasta do jogo porque faltavam os dados de `Data/Editor`; apenas `Data/Editor/Config` estava presente. A [instalação oficial do Toolkit](https://docs.baldursgate3.game/Getting_Started%3A_Installing_the_Toolkit) exige o DLC Toolkit Data. Por isso o primeiro root Mud Mephit foi feito como fonte LSX/LOCA compilada por LSLib, sem validação no editor naquele momento. Os dados do Toolkit passaram a estar presentes na verificação de 23 de setembro, descrita abaixo. Testes Lua cobrem identidade, geração, recusa de combate e descarte do UUID antigo. O teste no save validou a criação e revelou a falha de controle descrita abaixo.
-
-### Falha observada e rota de party follower
-
-O usuário executou `!flybg3_spawn` no BG3SE: `CreateAtObject` retornou o UUID real `a237bbd0-30c3-7eca-974c-c88a105dfb8f` e o mod confirmou o template Flyman. Porém, após `MakePlayer`, `IsPlayer` continuou zero e `!flybg3_observe` foi recusado. Logo, a expectativa documentada de `MakePlayer` **não se concretizou para esse Mud Mephit** no save testado. A chamada Osiris não lançou erro Lua; isso demonstra que `pcall` não basta para confirmar uma transição de estado do jogo.
-
-A documentação oficial [AddPartyFollower](https://docs.baldursgate3.game/index.php?title=AddPartyFollower) define a criatura como seguidor controlável, semelhante a uma invocação, sem torná-la personagem jogável completo. [IsPartyFollower](https://docs.baldursgate3.game/index.php?title=IsPartyFollower) verifica essa condição e [IsPlayer](https://docs.baldursgate3.game/index.php?title=IsPlayer) inclui party followers no seu conceito de controle, embora o adaptador aceite explicitamente qualquer um dos dois resultados positivos para tolerar diferenças de implementação. [CharacterJoinedParty](https://docs.baldursgate3.game/index.php?title=CharacterJoinedParty) é disparado ao anexar um follower. O código passou a solicitar `AddPartyFollower(Flyman, host)`, registrar o evento e só observar/agir se houver controle confirmado. Repetir `!flybg3_spawn` recupera o UUID existente e tenta anexá-lo novamente. A rota de follower foi validada no jogo conforme o teste abaixo; não haverá fallback silencioso para uma IA NPC nem reutilização do avatar.
-
-### Seguidor validado; bridge ausente; imortalidade de teste
-
-O teste seguinte no save confirmou `Flyman joined party; follower=1, player=0`, `Observation #1 sent` e `Flyman's turn`. Isso valida a rota de seguidor, inclusive um turno próprio, mas as requests 1–3 expiraram sem resposta. A inspeção local mostrou `observation.json` atual com UUID do novo Flyman, `action.json` e `heartbeat_brain.json` da sessão do dia anterior, e **nenhum processo Python**. Portanto a causa reproduzida do `IDLE` foi bridge inativo, não uma saída neural silenciosa. O bridge foi reiniciado em processo separado e confirmou `166700 neurons loaded; backend cpu` e `brain_loaded=true` no heartbeat. Uma nova observação do BG3 ainda é necessária para validar a decisão nesse corpo. O aviso Lua de timeout agora distingue heartbeat do cérebro ausente/antigo de uma simulação lenta; `!flybg3_status` exibe o estado antes do teste.
-
-A observação #3 também tinha `combat.active=true`, `my_turn=true`, HP 23/23, mas `nearest_hostile=null` e dano zero. O timeout é suficiente para explicar a ausência de decisão nessa tentativa; adicionalmente, se a próxima observação continuar sem estímulo, o executor físico se recusará a mover mesmo diante de atividade neural espontânea. Ainda não há evidência para atribuir o alvo ausente a `IsEnemy`, distância ou `CanSee`. A coleta agora registra uma linha `Sensory scan #N: characters=..., hostile=..., in_range=..., visible=...` para separar essas hipóteses no próximo teste, sem alterar o protocolo nem o encoder.
-
-Para a sobrevivência de teste, [SetImmortal](https://docs.baldursgate3.game/index.php?title=SetImmortal) aceita `(character, 1)` e [IsImmortal](https://docs.baldursgate3.game/index.php?title=IsImmortal) verifica o estado. O mod chama a API apenas depois de validar que `GetTemplate` é o root próprio do Flyman. `ImmortalForTesting=true` é padrão e o console oferece `!flybg3_immortal on|off`. O efeito sobre o corpo real ainda requer observação no save.
-
-## Campo de testes no Toolkit (2026-09-23)
-
-O DLC de dados do Toolkit agora está presente em `Data/Editor`; `Glasses.exe` 4.1.1.6931813 abriu e criou o projeto `FlyBG3Arena` com módulo UUID `00a41563-37f2-988d-98c9-5ca9bb65423a`. O editor está em `USER MODE`. Seu Level Browser permite carregar `Basic_Level_A`, mas não oferece `Create` para um nível novo. Isso coincide com a [nota oficial do Patch 8](https://baldursgate3.game/news/the-final-patch-new-subclasses-photo-mode-and-cross-play_138): a edição parcial permite adicionar/sobrescrever Items, Characters e Triggers em níveis existentes; edifícios, cenário estático e terreno continuam indisponíveis. O [guia da comunidade para níveis novos](https://wiki.bg3.community/Tutorials/Toolkit/Creating-a-new-level) usa MoonGlasses para liberar a opção `Create`.
-
-Foi carregado `Basic_Level_A`, escolhido `CONT_GEN_Crate_Clothing_A` na lista de Root Templates e usada a ferramenta Create do editor para colocar quatro caixas ao redor do START. O mesmo processo colocou `Goblins_Female_Guard`, apresentado como `Goblin Brawler`. **File → Save all** escreveu quatro `.lsf` em `Levels/Basic_Level_A/Items` e um `.lsf` em `Characters`. `Ctrl+Enter` abriu Game Mode com avatar, caixas e goblin visíveis; o retorno ao editor também funcionou. LSLib converteu os cinco `.lsf` para inspeção de template e posição, e empacotou um PAK separado com sete entradas. A compatibilidade do PAK com um save do jogo normal e a hostilidade efetiva do goblin ao Flyman ainda não foram verificadas. A descrição e os comandos estão em [TOOLKIT_ARENA.md](TOOLKIT_ARENA.md).
-
-Em 24/09/2026, uma nova edição do usuário no Toolkit acrescentou três `.lsf` em `Levels/Basic_Level_A/Characters`. A conversão local com LSLib identificou `BASE_Mephit_000`, `Dragon_Red_000` e `Dragon_Red_001`. A fonte do Toolkit foi comparada por SHA-256 com a fonte do repositório; só esses três arquivos eram novos. O PAK reconstruído lista quatro personagens, quatro itens e dez entradas ao todo. Após liberar o arquivo que estava aberto pelo Toolkit, `FlyBG3Arena.pak` foi reinstalado em `%LOCALAPPDATA%` e o SHA-256 instalado coincidiu com o gerado (`1CFB5277639E9EF1809F073BA4A9255E48FEFB470558BAB65B20E6E6AD4D26FE`). As novas criaturas ainda não foram validadas no jogo normal.
+The connectome is derived from electron microscopy and is not a complete biological brain model. The simulation omits detailed dendrites, graded signals, full neuromodulation, plasticity, and many physiological variables. Visual input is an abstract detector rather than pixels. A symbolic action or speech phrase is a software readout of simulated activity; it is not a report of subjective experience.

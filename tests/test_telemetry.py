@@ -46,7 +46,7 @@ def test_population_rate_and_window_are_normalized(observation):
     collector = TelemetryCollector(groups, neuron_count=22, window_steps=2, dt=0.5)
     collector.observe(np.array([0, 2, 3]))
     collector.observe(np.array([1, 4, 5]))
-    collector.observe(np.array([0, 6, 7]))  # first frame leaves the rate window
+    collector.observe(np.array([0, 6, 7]))
     result = collector.snapshot(observation, "TURN_LEFT", 250).to_dict()
     assert result["groups"]["small"] == {"hz": 1.0, "spikes": 2, "neurons": 2}
     assert result["groups"]["large"] == {"hz": 0.2, "spikes": 4, "neurons": 20}

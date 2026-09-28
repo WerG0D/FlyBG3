@@ -13,8 +13,6 @@ class CombatAction(StrEnum):
     END_TURN = "end_turn"
 
 
-# Exact cell types in MaleCNS v1.0. These are features, not claims that one
-# neuron commands a BG3 attack. The learned mapping supplies that association.
 FEATURE_NAMES = (
     "DNa02_L", "DNa02_R", "DNp01_L", "DNp01_R",
     "DNg100_L", "DNg100_R", "MDN_L", "MDN_R",
@@ -35,8 +33,6 @@ class NeuralFeatures:
             raise ValueError("Neural rates must be finite and nonnegative")
 
     def vector(self) -> tuple[float, ...]:
-        # 50 Hz is the maximum rate at the default 20 ms LIF step. A fixed
-        # scale keeps the linear readout numerically bounded and auditable.
         return (1.0,) + tuple(min(x / 50.0, 1.0) for x in self.rates_hz)
 
     def to_dict(self) -> dict[str, float]:
@@ -45,7 +41,7 @@ class NeuralFeatures:
 
 @dataclass(frozen=True)
 class CombatOutcome:
-    status: str  # executed | invalid | failed
+    status: str
     reason: str = ""
     damage_dealt: float = 0.0
     damage_received: float = 0.0

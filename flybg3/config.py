@@ -25,8 +25,8 @@ class EncoderConfig:
     left_right_gain: float = 1.0
     damage_gain: float = 0.8
     tracking_gain: float = 0.6
-    proximity_gain: float = 0.0 # opt-in experimental size/near-field proxy
-    health_stress_gain: float = 0.0 # opt-in bilateral visceral-threat proxy
+    proximity_gain: float = 0.0
+    health_stress_gain: float = 0.0
     cap: float = 0.8
     minimum_sample_seconds: float = 0.05
     maximum_sample_seconds: float = 10.0
@@ -37,7 +37,7 @@ class DecoderConfig:
     minimum_activity: float = 0.1
     rate_scale_hz: float = 10.0
     decision_window: int = 50
-    smoothing: float = 0.25  # previous-output contribution
+    smoothing: float = 0.25
     hysteresis: float = 0.05
     minimum_action_decisions: int = 1
 
@@ -70,14 +70,14 @@ class TelemetryScaleConfig:
 @dataclass
 class TelemetryConfig:
     enabled: bool = True
-    smoothing: float = 0.25  # display EMA: current-sample contribution
+    smoothing: float = 0.25
     scale: TelemetryScaleConfig = field(default_factory=TelemetryScaleConfig)
 
 
 @dataclass
 class SpeechVoiceConfig:
-    rate: int = 0  # System.Speech range: -10..10
-    volume: int = 100  # 0..100
+    rate: int = 0
+    volume: int = 100
 
 
 @dataclass
@@ -96,10 +96,10 @@ class SpeechConfig:
 
 @dataclass
 class CombatConfig:
-    mode: str = "observe" # observe | validate | train | eval
+    mode: str = "observe"
     physical_actions_enabled: bool = False
-    policy: str = "trainable" # trainable | frozen | random
-    algorithm: str = "td" # td | reinforce (external readout only)
+    policy: str = "trainable"
+    algorithm: str = "td"
     learning_rate: float = 0.05
     discount: float = 0.9
     epsilon: float = 0.2

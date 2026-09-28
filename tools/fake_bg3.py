@@ -75,8 +75,6 @@ def main() -> None:
     args.output.parent.mkdir(parents=True, exist_ok=True)
     for rid, name in enumerate(names, 1):
         if sim is not None and rid > 1:
-            # Standalone scenarios have the same initial neural state. Multi-phase
-            # persistence experiments live in flybg3.experiments instead.
             sim.reset()
         observation = scenario(session, rid, npc, target, name)
         if args.bridge_dir:
